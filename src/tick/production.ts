@@ -9,6 +9,7 @@ export function production(ctx: Ctx): void {
   if (ctx.config.labourSharing !== 'in-order') throw new Error(`open for Rex (Q15): labourSharing ${ctx.config.labourSharing}`)
   const { labour, materials, utilities } = ctx.providers
   const day = ctx.state.settlement.day
+  const pending: { inventory: string; recipe: string; q: number }[] = []
   for (const biz of Object.values(ctx.state.businesses)) {
     if (!biz.open || !ctx.staffed.has(biz.id)) { delete ctx.state.production[biz.id]; setStatus(ctx, biz.id, 'dormant'); continue }
     let labourHours = 0
@@ -42,7 +43,7 @@ export function production(ctx: Ctx): void {
       const finite = (value: number) => (Number.isFinite(value) ? value : -1)
       lines.push({ recipe: line.recipe, q, caps: { equipment: finite(equipment), labour: finite(labourCap), materials: finite(materialCap), utilities: finite(utility) } })
       if (q > 0) {
-        materials.produce(biz.inventory, line.recipe, q)
+        pending.push({ inventory: biz.inventory, recipe: line.recipe, q })
         labourHours -= q * labourHoursPerUnit
         produced = true
       }
@@ -50,4 +51,6 @@ export function production(ctx: Ctx): void {
     ctx.state.production[biz.id] = { day, lines }
     setStatus(ctx, biz.id, produced ? 'producing' : 'staffed')
   }
+  // Validate every line before any business can change the host's inventory.
+  for (const { inventory, recipe, q } of pending) materials.produce(inventory, recipe, q)
 }

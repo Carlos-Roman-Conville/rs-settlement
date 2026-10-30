@@ -115,6 +115,32 @@ describe('V4 an Infinity cap never yields an infinite or NaN output', () => {
     }
     expect(Number.isFinite(ctx.providers.materials.get('inv.shop', 'water'))).toBe(true)
   })
+  it('second line all-Infinity leaves stock unchanged', () => {
+    const ctx = shop({ fixtures: 2, hours: 100, materials: 100, utility: Number.POSITIVE_INFINITY })
+    ctx.providers.materials.recipes.free = { inputs: [], output: 'water', yield: 1, unitsPerFixtureDay: 10, labourHoursPerUnit: 0 }
+    ctx.r.run({ type: 'setLines', biz: ctx.biz, lines: [
+      { recipe: 'bar', equipment: [BENCH] }, { recipe: 'free', equipment: [] },
+    ] })
+    const before = structuredClone(ctx.providers.materials.stock)
+    const produce = vi.spyOn(ctx.providers.materials, 'produce')
+    expect(() => ctx.r.tick()).toThrow(`open for Rex (Q20): non-finite production Q for business ${ctx.biz}, line 2, recipe free`)
+    expect(produce).not.toHaveBeenCalled()
+    expect(ctx.providers.materials.stock).toEqual(before)
+  })
+  it('later business all-Infinity leaves earlier business stock unchanged', () => {
+    const ctx = shop({ fixtures: 2, hours: 100, materials: 100, utility: Number.POSITIVE_INFINITY })
+    ctx.providers.materials.recipes.free = { inputs: [], output: 'water', yield: 1, unitsPerFixtureDay: 10, labourHoursPerUnit: 0 }
+    const biz = ctx.r.run<string>({ type: 'openBusiness', kind: 'smith',
+      premises: [{ bldg: ctx.bldg, rooms: ['shop'] }], operator: 'smith', inventory: 'inv.second',
+      lines: [{ recipe: 'free', equipment: [] }] })
+    const post = ctx.r.run<string>({ type: 'addPost', biz, role: 'smith', wage: 0, hours: 10 })
+    ctx.r.run({ type: 'hire', post, holder: 'second-worker' })
+    const before = structuredClone(ctx.providers.materials.stock)
+    const produce = vi.spyOn(ctx.providers.materials, 'produce')
+    expect(() => ctx.r.tick()).toThrow(`open for Rex (Q20): non-finite production Q for business ${biz}, line 1, recipe free`)
+    expect(produce).not.toHaveBeenCalled()
+    expect(ctx.providers.materials.stock).toEqual(before)
+  })
   it('every cap is Infinity', () => {
     const free: StubRecipe = { inputs: [], output: 'water', yield: 1, unitsPerFixtureDay: 10, labourHoursPerUnit: 0 }
     const ctx = shop({ fixtures: 2, hours: 100, materials: 0, utility: Number.POSITIVE_INFINITY, recipe: free })
