@@ -67,6 +67,42 @@ the economy's quote.
 - **Independence:** every validation above that is not "none needed" needs a check unit written by a different
   model than the code's, and the registry keeper's re-audit (PLATFORM §11a qualification).
 
+## 4b. Building decay by material class (SET-20; review R-2 accepted the structure, 2026-10-30)
+
+The interim aggregate of overlap group DUP-9 (owner later: Physical Reality's materials mechanism, Phase 9; then
+these numbers become its validation data). Conditions of R-2: rates are data, labelled, from sources; exposure is a
+host-supplied class, never weather computed here; the band shape and output factors stay level 5; an unsourced
+class is null and flagged.
+
+**Model (level 5, flagged).** A building carries an optional `decayClass` (host data). The class gives
+`yearsToRuin`, the years from condition 1 to the ruined band without any repair. The four bands keep today's shape
+(400 : 300 : 150 of the time in fine, sound and poor), scaled so the whole run takes `yearsToRuin x 365` days. A
+host exposure class multiplies the time (`exposure: { [class]: factor | null }`, `sheltered` = 1). **A building
+with no class, a null class or a null exposure factor does not decay** and is listed by a query
+`unvalidatedDecay()`. That replaces today's unsourced 850 days with no decay rather than with another guess.
+
+**The assumption joining evidence to model (level 5):** a building's years to ruin is the service life of its
+shortest-lived envelope component, the roof. The sources give service lives under normal upkeep, not decay
+after neglect, and no source read gives the rate at which walls fail once the roof is gone. Both are open.
+
+| Class | yearsToRuin | Range in sources | Label | Sources |
+|---|---|---|---|---|
+| `palm-thatch` (timber or wattle walls, palm roof) | 5 | 4 to 10; 4 on a salt-wind Caribbean coast; 5 to 8 for coconut palm | estimate (secondary: an academic abstract, vendor and operator reports) | APCC journal abstract on coconut palm wood shingles (https://apccsec.org/journal-sub/index_php/journalicc/article/view/238); InspectAPedia, thatch roofs (https://inspectapedia.com/roof/Thatch_Roofs.php); Forever Bamboo, thatch FAQs (https://blog.foreverbamboo.com/7-thatch-faqs/) |
+| `reed-thatch` (straw or reed roof, temperate) | 25 | longstraw 15 to 25; combed wheat reed 25 to 35; water reed 25 to 40 | estimate (secondary: insurer and property guides) | Jensten Insurance, how long a thatched roof lasts (https://jensteninsurance.co.uk/how-long-does-a-thatched-roof-last/); Rightmove, thatched roofs (https://www.rightmove.co.uk/news/?p=57178) |
+| `wood-shingle` (timber walls, shingle roof) | 25 | 20 to 30 | estimate (secondary, modern inspection charts) | InterNACHI life expectancy chart (https://www.nachi.org/life-expectancy.htm); Roof Predict, roof lifespans (https://roofpredict.com/resources/how-long-does-a-roof-last) |
+| `tile-or-slate` (masonry walls, tile or slate roof) | 50 | over 50 for the roof; brick walls 75 to 100 or more | estimate (secondary, modern charts) | InterNACHI chart and its Florida chart (https://www.nachi.org/florida-life-expectancy.htm) |
+| `masonry` (brick or stone walls) | null | walls 75 to 100+ (modern charts); Spanish-era houses in Jamaica still standing over a century after 1655 (Edward Long 1774, via the Caribbean wattle-and-daub essay) | flagged: the roof decides, and a masonry building's roof class must be given | Long via Vanderbilt history blog (https://vugradhistory.wordpress.com/2020/05/14/the-legacy-of-wattle-and-daub-homes-in-colonial-caribbean-architecture/) |
+| `wattle-and-daub` walls | null | "should last indefinitely" if maintained and sheltered; 700-year-old examples (conservation source) | flagged: no rate under neglect | Building Conservation, wattle and daub (https://Buildingconservation.com/articles/wattleanddaub/wattleanddaub.htm) |
+
+Exposure classes: `sheltered` 1 (the definition of the class values); `salt-wind` null (the one figure, 4 years
+on a Caribbean coast against 10 elsewhere for palm, is one operator's report: too weak for a factor, flagged).
+
+**Validation:** VAL-D1 becomes a passing test once the unit lands: for each class with a value, days from condition
+1 to the ruined band equal `yearsToRuin x 365` within 1 %, and each value lies inside its source range.
+**Open:** the post-roof wall decay rate; a period (not modern) source for timber in the tropics with termites;
+the exposure factor. They go to Physical Reality's materials work (DUP-9) and, where a class stays empty for a
+game's buildings, to Rex.
+
 ## 5. Gates
 
 Every settlement belt unit from 2026-10-30 carries a validation spec in its Gate: the suite includes
@@ -79,3 +115,4 @@ loosened tolerance.
 | Date | What |
 |---|---|
 | 2026-10-30 | Written under Rex's V&V directive (PLATFORM.md §11a); SET-20 (decay fails plausibility) recorded; validation tests queued as unit 2645 |
+| 2026-10-30 | §4b: decay by material class, the registry keeper's review R-2 accepted in structure; class table sourced and labelled; unit 2646 queued |
