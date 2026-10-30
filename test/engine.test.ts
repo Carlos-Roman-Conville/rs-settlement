@@ -492,6 +492,39 @@ describe('the hamlet example (reuse proof)', () => {
 })
 
 
+describe('U17 setWage is the only channel for a wage level', () => {
+  it('Post.wage never moves in a tick, each wage row equals it, and setWage changes the next row', () => {
+    const ctx = fresh()
+    const { r } = ctx
+    const { p1 } = openShop(ctx)
+    r.run({ type: 'hire', post: p1, holder: 'butcher' })
+    const rows = () => ledger(r.state, { kind: 'wage', subject: p1 }).map((row) => row.amount)
+    for (let day = 0; day < 10; day++) {
+      const wage = r.state.posts[p1].wage
+      const paid = rows().length
+      r.tick()
+      expect(r.state.posts[p1].wage).toBe(wage)
+      expect(rows().slice(paid)).toEqual([wage])
+    }
+    r.run({ type: 'setWage', post: p1, wage: 5 })
+    expect(r.state.posts[p1].wage).toBe(5)
+    const paid = rows().length
+    r.tick()
+    expect(rows().slice(paid)).toEqual([5])
+  })
+  it('only addPost and setWage write a wage in the command and tick sources', async () => {
+    // the package has no node typings, so the module name is a variable
+    const specifier = 'node:fs'
+    const { readFileSync, readdirSync } = await import(/* @vite-ignore */ specifier) as {
+      readFileSync(file: string, encoding: string): string
+      readdirSync(dir: string): string[]
+    }
+    const files = ['src/commands.ts', ...readdirSync('src/tick').map((name) => `src/tick/${name}`)]
+    const sites = files.flatMap((file) => (readFileSync(file, 'utf8').match(/\.wage\s*=[^=]|\bwage:\s*finite\(c\.wage,/g) ?? []).map(() => file))
+    expect(sites).toEqual(['src/commands.ts', 'src/commands.ts'])
+  })
+})
+
 describe('U18 finite pool hours are shared across businesses and projects', () => {
   it('grants at most the daily supply across roles and uses partial grants in caps', () => {
     const ctx = fresh()

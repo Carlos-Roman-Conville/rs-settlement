@@ -20,6 +20,7 @@ any game changed.** Steps 2 onward wait on the answers `MIGRATION.md` names per 
 Labour uses the shared `LabourSupply` contract and person-hours, with finite daily pool grants (U18, V5).
 Production and project wages preserve the converted fixture results; `labourSharing` defaults to `in-order` (U19).
 `setInventory` rebinds a business to the host's inventory ref before its next tick (U20).
+`setWage` is the only channel for a wage level; U17 pins it and Q19 (wage debt) is open.
 
 `src/`: the records (`state.ts`), ids (`ids.ts`), tunables with placeholder bands (`config.ts`, every number
 proposed), the four provider interfaces with in-memory stubs (`providers.ts`), the command union and handlers

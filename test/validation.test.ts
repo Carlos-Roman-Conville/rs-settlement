@@ -188,6 +188,28 @@ describe('V7 a project draws exactly the materials it names, once', () => {
   })
 })
 
+describe('V8 a wage change conserves money and the rows follow the post', () => {
+  it('thirty hamlet ticks with one setWage on day 10 conserve money; each wage row equals the post wage', () => {
+    const { r, ids } = buildHamlet()
+    const before = totalMoney(r.state)
+    const rows = () => r.state.ledger.filter((row) => row.kind === 'wage' && row.subject === ids.post).map((row) => row.amount)
+    for (let day = 0; day < 30; day++) {
+      if (day === 10) r.run({ type: 'setWage', post: ids.post, wage: 3 })
+      const wage = r.state.posts[ids.post].wage
+      const paid = rows().length
+      r.tick()
+      expect(rows().slice(paid)).toEqual([wage])
+      expect(totalMoney(r.state)).toBe(before)
+    }
+    expect(rows().slice(0, 10)).toEqual(Array(10).fill(2))
+    expect(rows().slice(10)).toEqual(Array(20).fill(3))
+  })
+})
+
+describe('VAL-W1 starting wages against the benchmark band', () => {
+  it.todo('VAL-W1 every starting wage within the STARTING_TOWN.md benchmark band for its trade, ±50 % (waits on Q10)')
+})
+
 // A building without businesses keeps lifetime sweeps independent of production and ledger growth.
 function decayBuilding(decayClass?: string, exposure?: string) {
   const r = new Runner(initialState('stl.decay', 'decay'))

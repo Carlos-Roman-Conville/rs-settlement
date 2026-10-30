@@ -34,6 +34,7 @@ alignment command the `AlignmentState` JSON is byte-identical to a run without t
 | U18 | finite person-hours | two businesses and a project share daily pool grants without exceeding supply; unsupported labourSharing names Q15 |
 | U19 | conversion preserves results | U7, U8, U13, U16, A1 and hamlet production, wages and projects retain their expected numbers |
 | U20 | inventory rebinding | setInventory validates the business and ref; the next tick consumes the new inventory |
+| U17 | setWage is the only wage channel | over ten ticks `Post.wage` never changes and each day's `wage` row equals it; `setWage` changes it and the next row follows; `.wage =` is written only by `addPost` and `setWage` (Q19 open: may a payer go into debt) |
 | U12 | the engine names nobody | every person id in a state came from a command; `LabourProvider.draw` returns pool ids, never a person the host did not register |
 
 ## Adapter tests (`Games/RPG's/pirate-ship/web/src/settlement/*.test.ts`)
@@ -125,6 +126,8 @@ Stability, conservation and boundary rows (V) and validation against evidence (V
 | V5 | 30 hamlet ticks conserve hours across lines and projects, never exceeding daily supply |
 | V6 | condition stays in [0, 1], falls monotonically over 1,000 ticks without repair, never below 0; a completed repair raises it |
 | V7 | a project draws exactly the materials it names, once; a cancelled project draws nothing afterwards |
+| V8 | thirty hamlet ticks with one `setWage` on day 10 conserve money; each wage row equals the post's wage at that step |
+| VAL-W1 | (todo, waits on Q10) every starting wage within the benchmark band for its trade, ±50 % |
 | VAL-D1, VAL-D1a | sourced material lifetimes reach ruin within 1%; unclassified buildings keep their condition for 1,000 ticks and are listed by `unvalidatedDecay`; null classes and exposures are flagged |
 
 VAL-S1, VAL-C1, VAL-W1 and VAL-R1 wait for the starting data (Q10).
