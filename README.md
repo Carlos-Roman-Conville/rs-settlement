@@ -21,6 +21,7 @@ Labour uses the shared `LabourSupply` contract and person-hours, with finite dai
 Production and project wages preserve the converted fixture results; `labourSharing` defaults to `in-order` (U19).
 `setInventory` rebinds a business to the host's inventory ref before its next tick (U20).
 `setWage` is the only channel for a wage level; U17 pins it and Q19 (wage debt) is open.
+The hamlet's buildings carry decay classes (the house `reed-thatch`, the shop `wood-shingle`), so the example exercises decay.
 
 `src/`: the records (`state.ts`), ids (`ids.ts`), tunables with placeholder bands (`config.ts`, every number
 proposed), the four provider interfaces with in-memory stubs (`providers.ts`), the command union and handlers

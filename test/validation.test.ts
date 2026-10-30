@@ -115,6 +115,17 @@ describe('V4 an Infinity cap never yields an infinite or NaN output', () => {
     }
     expect(Number.isFinite(ctx.providers.materials.get('inv.shop', 'water'))).toBe(true)
   })
+  // Observed: q = Infinity (Math.floor(Infinity)), so materials.produce adds Infinity to inventory and production records it.
+  // Fix (src/tick/production.ts line 40): `const q = Number.isFinite(cap) ? Math.max(0, Math.floor(cap)) : 0` (or throw). QUESTIONS.md Q20.
+  it.skip('every cap is Infinity', () => {
+    const free: StubRecipe = { inputs: [], output: 'water', yield: 1, unitsPerFixtureDay: 10, labourHoursPerUnit: 0 }
+    const ctx = shop({ fixtures: 2, hours: 100, materials: 0, utility: Number.POSITIVE_INFINITY, recipe: free })
+    ctx.r.state.businesses[ctx.biz].lines[0].equipment = []
+    ctx.r.tick()
+    for (const value of numbers(ctx)) expect(Number.isNaN(value)).toBe(false)
+    expect(Number.isFinite(ctx.r.state.production[ctx.biz].lines[0].q)).toBe(true)
+    expect(Number.isFinite(ctx.providers.materials.get('inv.shop', 'water'))).toBe(true)
+  })
 })
 
 describe('V6 building condition stays in [0, 1] and only repair raises it', () => {
