@@ -7,11 +7,19 @@ import { finite as checked, type Ctx } from '../context.ts'
 
 export function production(ctx: Ctx): void {
   if (ctx.config.labourSharing !== 'in-order') throw new Error(`open for Rex (Q15): labourSharing ${ctx.config.labourSharing}`)
+  // Check every active line for Q20 before production changes any host inventory.
+  productionPass(ctx, true)
+  productionPass(ctx, false)
+}
+
+function productionPass(ctx: Ctx, checkOnly: boolean): void {
   const { labour, materials, utilities } = ctx.providers
   const day = ctx.state.settlement.day
-  const pending: { inventory: string; recipe: string; q: number }[] = []
   for (const biz of Object.values(ctx.state.businesses)) {
-    if (!biz.open || !ctx.staffed.has(biz.id)) { delete ctx.state.production[biz.id]; setStatus(ctx, biz.id, 'dormant'); continue }
+    if (!biz.open || !ctx.staffed.has(biz.id)) {
+      if (!checkOnly) { delete ctx.state.production[biz.id]; setStatus(ctx, biz.id, 'dormant') }
+      continue
+    }
     let labourHours = 0
     for (const id of biz.posts) {
       const post = ctx.state.posts[id]
@@ -40,17 +48,21 @@ export function production(ctx: Ctx): void {
       for (const premises of biz.premises) utility = Math.min(utility, utilities.capacity(premises.bldg, line.recipe, ctx.state))
       const q = Math.max(0, Math.floor(Math.min(equipment, labourCap, materialCap, utility)))
       if (!Number.isFinite(q)) throw new Error(`open for Rex (Q20): non-finite production Q for business ${biz.id}, line ${lineIndex + 1}, recipe ${line.recipe}`)
+      if (checkOnly) {
+        labourHours -= q * labourHoursPerUnit
+        continue
+      }
       const finite = (value: number) => (Number.isFinite(value) ? value : -1)
       lines.push({ recipe: line.recipe, q, caps: { equipment: finite(equipment), labour: finite(labourCap), materials: finite(materialCap), utilities: finite(utility) } })
       if (q > 0) {
-        pending.push({ inventory: biz.inventory, recipe: line.recipe, q })
+        materials.produce(biz.inventory, line.recipe, q)
         labourHours -= q * labourHoursPerUnit
         produced = true
       }
     }
-    ctx.state.production[biz.id] = { day, lines }
-    setStatus(ctx, biz.id, produced ? 'producing' : 'staffed')
+    if (!checkOnly) {
+      ctx.state.production[biz.id] = { day, lines }
+      setStatus(ctx, biz.id, produced ? 'producing' : 'staffed')
+    }
   }
-  // Validate every line before any business can change the host's inventory.
-  for (const { inventory, recipe, q } of pending) materials.produce(inventory, recipe, q)
 }

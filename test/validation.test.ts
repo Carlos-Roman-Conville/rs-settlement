@@ -93,6 +93,38 @@ describe('V3 production Q is monotone non-decreasing in every factor', () => {
 })
 
 describe('V4 an Infinity cap never yields an infinite or NaN output', () => {
+  it('two lines sharing one input never take stock below zero', () => {
+    const ctx = shop({ fixtures: 10, hours: 1000, materials: 100, utility: 1000 })
+    ctx.r.run({ type: 'setLines', biz: ctx.biz, lines: [
+      { recipe: 'bar', equipment: [BENCH] }, { recipe: 'bar', equipment: [BENCH] },
+    ] })
+    const remaining: number[] = []
+    const produce = ctx.providers.materials.produce.bind(ctx.providers.materials)
+    vi.spyOn(ctx.providers.materials, 'produce').mockImplementation((inventory, recipe, units) => {
+      produce(inventory, recipe, units)
+      remaining.push(ctx.providers.materials.get(inventory, 'ore'))
+    })
+    ctx.r.tick()
+    expect(ctx.r.state.production[ctx.biz].lines.map((line) => line.q)).toEqual([100, 0])
+    expect(ctx.r.state.production[ctx.biz].lines[1].caps.materials).toBe(0)
+    expect(remaining).toEqual([0])
+    expect(remaining.every((stock) => stock >= 0)).toBe(true)
+    expect(ctx.providers.materials.get('inv.shop', 'ore')).toBe(0)
+    expect(ctx.providers.materials.get('inv.shop', 'bar')).toBe(100)
+  })
+  it('a later line consumes the first line output on the same day', () => {
+    const ctx = shop({ fixtures: 10, hours: 1000, materials: 100, utility: 1000 })
+    ctx.providers.materials.recipes.finished = {
+      inputs: [{ good: 'bar', units: 1 }], output: 'finished', yield: 1, unitsPerFixtureDay: 100, labourHoursPerUnit: 0,
+    }
+    ctx.r.run({ type: 'setLines', biz: ctx.biz, lines: [
+      { recipe: 'bar', equipment: [BENCH] }, { recipe: 'finished', equipment: [] },
+    ] })
+    ctx.r.tick()
+    expect(ctx.r.state.production[ctx.biz].lines.map((line) => line.q)).toEqual([100, 100])
+    expect(ctx.providers.materials.get('inv.shop', 'bar')).toBe(0)
+    expect(ctx.providers.materials.get('inv.shop', 'finished')).toBe(100)
+  })
   const noInputs: StubRecipe = { inputs: [], output: 'water', yield: 1, unitsPerFixtureDay: 10, labourHoursPerUnit: 2.5 }
   const numbers = (ctx: ReturnType<typeof shop>) => {
     const entry = ctx.r.state.production[ctx.biz]
