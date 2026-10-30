@@ -51,3 +51,6 @@ Inherited from [HQ/PRINCIPLES.md](../../HQ/PRINCIPLES.md) and [Toolchain/SCOPE.m
   infrastructure and land use to this engine's scope: recorded in `PACKAGES.md` s8, not designed, not built. The
   starting-town rows (Q1, Q5, Q6, Q7, Q9, Q10, Q11, Q15) are being researched historically for
   `files/pirate-ship/STARTING_TOWN.md` (Rex: historical data fills answers first).
+- 2026-10-30, evening: DUP-44 fixed (`Project.inventory` apart from `Project.account`; U16; 27 tests) so the
+  kernel's byte-identity baseline is taken after it. The kernel keeper's P0 adoption (ids, Runner.replay, clock,
+  transactions) is answered in their DESIGN.md s12 and waits on Rex.

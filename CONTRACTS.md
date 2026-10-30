@@ -248,6 +248,22 @@ marked lines above, and they are these:
 Nothing in Settlement changes until the economy keeper confirms; then the §13 commit follows, this file is marked
 agreed with the date, and the identical text is held in both repos.
 
+## 15. Project inventories (DUP-44; proposed by the economy keeper, agreed by the settlement keeper, 2026-10-30)
+
+`Project.account` was used both as the money holder and as the inventory ref in Settlement's project step
+(`Toolchain/GRAPH.md` DUP-44). Agreed:
+
+- `Project` gains `inventory: string`, an opaque inventory ref like `Business.inventory`.
+- The project step draws materials through `have` / `take` on `inventory`, and pays wages from `account` exactly
+  as before.
+- `startProject` takes `inventory` optionally, defaulting to `account`, so existing logs and the hamlet replay are
+  unchanged.
+- The pirate adapter resolves it through the economy adapter's aliases as it does business refs.
+- This supersedes the §2 note that a project's materials are drawn from `Project.account`.
+
+Timing: before the kernel adoption, so the kernel's byte-identity baseline is taken after the fix. Settlement's
+test: U16 (materials from `project.inventory`, wages from `project.account`, the default for old callers).
+
 ## Log
 
 | Date | What |
@@ -255,3 +271,4 @@ agreed with the date, and the identical text is held in both repos.
 | 2026-10-30 | Proposal written and sent to the settlement keeper (economy keeper) |
 | 2026-10-30 | Counter-proposal with inline amendments and §14 returned to the economy keeper (settlement keeper) |
 | 2026-10-30 | All nine amendments confirmed by the economy keeper; §13 a, b, c, e landed in Settlement with U13, U14; agreed |
+| 2026-10-30 | §15 (DUP-44, `Project.inventory`) proposed by the economy keeper, agreed and landed in Settlement with U16 |

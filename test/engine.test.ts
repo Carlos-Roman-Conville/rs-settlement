@@ -362,6 +362,29 @@ describe('U14 pay and setWage are the ledger seam (CONTRACTS.md s3, s5, s13c, s1
   })
 })
 
+describe('U16 a project draws materials from its own inventory ref, not from its payer (DUP-44)', () => {
+  it('materials come from project.inventory; wages come from project.account', () => {
+    const ctx = fresh()
+    const { r, providers, dist } = ctx
+    const parcel = r.run<string>({ type: 'addParcel', district: dist, footprint: { x: 20, y: 0, w: 10, h: 10 }, access: ['road'] })
+    r.run({ type: 'grantTitle', subject: parcel, holder: 'butcher' })
+    const before = r.state.ledger.length
+    providers.materials.set('inv.yard', 'timber', 10)
+    providers.materials.set('butcher', 'timber', 0)
+    const proj = r.run<string>({ type: 'startProject', kind: 'construct', target: parcel, account: 'butcher', inventory: 'inv.yard', pool: 'pool.housing', wage: 1, labourDays: 1,
+      materials: [{ material: 'timber', units: 10 }], plan: { footprint: { x: 21, y: 1, w: 4, h: 4 }, rooms: [{ id: 'hut', name: 'hut', tiles: { x: 21, y: 1, w: 4, h: 4 }, use: 'living' }] } })
+    expect(r.state.projects[proj].inventory).toBe('inv.yard')
+    r.tick()
+    expect(r.state.projects[proj].status).toBe('done')
+    expect(providers.materials.get('inv.yard', 'timber')).toBe(0)
+    expect(providers.materials.get('butcher', 'timber')).toBe(0)
+    const wage = r.state.ledger.slice(before).find((row) => row.subject === proj && row.kind === 'wage')!
+    expect(wage.from).toBe('butcher')
+    const legacy = r.run<string>({ type: 'startProject', kind: 'repair', target: ctx.bldg, account: 'butcher', pool: 'pool.housing', labourDays: 1 })
+    expect(r.state.projects[legacy].inventory).toBe('butcher')   // the default keeps old callers working; the record no longer conflates the two
+  })
+})
+
 describe('the hamlet example (reuse proof)', () => {
   it('builds, staffs and produces with no game data', () => {
     const { r, providers, ids } = buildHamlet()

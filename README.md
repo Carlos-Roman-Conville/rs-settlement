@@ -33,6 +33,9 @@ gained `addBuilding` (seed a standing building) and `test/acceptance.test.ts` (t
 rates come from `MaterialProvider.rates(recipe)` each tick; `TransactionKind` is any string (`SETTLEMENT_KINDS`
 lists the engine's own); the `pay` command and the `ledger` query's holder and day range are the economy's
 `LedgerProvider` over this engine's accounts; `setWage` sets a post's wage. U13, U14; 26 tests.
+`Project.inventory` (DUP-44, the economy keeper's finding): a project draws its materials from its own inventory
+ref, no longer from its payer's holder id; `startProject` takes `inventory` (default: the account, for old
+callers). U16; 27 tests.
 
 What the code encodes of Rex's answers: a sale changes the holder and nothing else (U3); a title can refuse a
 buyer (U3, Q6); assignments never end on their own (U4); a business runs while its operator is away if a manager

@@ -164,7 +164,8 @@ export interface Project {
   labourDays: number
   pool: string              // where labour is drawn from
   wage: number              // per worker-day
-  account: string           // who pays
+  account: string           // who pays (a holder id)
+  inventory: string         // where the materials are drawn from (an opaque inventory ref, CONTRACTS.md s2); DUP-44
   permitRequired: boolean
   permit: string | null     // a permission id
   materialsDrawn: boolean

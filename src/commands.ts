@@ -25,7 +25,7 @@ export type Command =
   | { type: 'setRent'; lease: string; rent: number }
   // building
   | { type: 'addBuilding'; parcel: string; footprint: Rect; storeys?: number; condition?: number; rooms?: Room[]; placements?: Placement[]; fixtures?: string[] }
-  | { type: 'startProject'; kind: ProjectKind; target: string; plan?: ProjectPlan; materials?: { material: string; units: number }[]; labourDays?: number; pool?: string; wage?: number; account: string; permitRequired?: boolean; permit?: string | null }
+  | { type: 'startProject'; kind: ProjectKind; target: string; plan?: ProjectPlan; materials?: { material: string; units: number }[]; labourDays?: number; pool?: string; wage?: number; account: string; inventory?: string; permitRequired?: boolean; permit?: string | null }
   | { type: 'advanceProject'; project: string; workerDays: number }
   | { type: 'cancelProject'; project: string }
   | { type: 'setLayout'; bldg: string; layout: Omit<Layout, 'version'>; by: string }
@@ -317,7 +317,7 @@ export function startProject(ctx: Ctx, c: Extract<Command, { type: 'startProject
   ctx.state.projects[id] = { id, kind: c.kind, target: c.target, plan: structuredClone(plan),
     materials: (c.materials ?? []).map((item) => ({ material: nonempty(item.material, 'material'), units: finite(item.units, 'units', 0) })),
     labourDays: finite(c.labourDays ?? 0, 'labourDays', 0), pool: c.pool ?? 'pool.default', wage: finite(c.wage ?? 0, 'wage', 0),
-    account: nonempty(c.account, 'account'), permitRequired: !!c.permitRequired, permit: c.permit ?? null,
+    account: nonempty(c.account, 'account'), inventory: nonempty(c.inventory ?? c.account, 'inventory'), permitRequired: !!c.permitRequired, permit: c.permit ?? null,
     materialsDrawn: (c.materials ?? []).length === 0, progress: 0, status: 'active', result: null }
   return id
 }
