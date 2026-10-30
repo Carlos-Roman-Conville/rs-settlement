@@ -212,6 +212,7 @@ assignment; every rule Rex has not decided is a config key or an open item in th
 4. Is named characters' spending simulated, or only pools' (§5)?
 5. The price formula and its constants (§7): a config key until then.
 6. Wage levels per trade (Settlement Q10) and whether a market wage quote may move them.
+8. (settlement, added 2026-10-30, s17) May a payer go into debt, or does an unpaid wage stall the post?
 7. (settlement, added) Does an idle fixture count for "the settlement has it" (Settlement Q9; the reader's
    `hasFixture` default is yes)?
 
@@ -264,6 +265,67 @@ agreed with the date, and the identical text is held in both repos.
 Timing: before the kernel adoption, so the kernel's byte-identity baseline is taken after the fix. Settlement's
 test: U16 (materials from `project.inventory`, wages from `project.account`, the default for old callers).
 
+## 16. One labour interface, in person-hours (DUP-26, DUP-29; PROPOSED by the settlement keeper 2026-10-30, not agreed)
+
+Rex approved the owners (OVERLAPS-BATCH-1 groups 10 and 12, 2026-10-30): the population supplies person-hours
+(Reality in the interim, Society later); Settlement owns assignment (who works where) and the labour cap; Economy
+owns the labour each unit of output requires and its price. One unit: **person-hours**. One interface, declared
+here, held byte-identically by both engines as `src/contracts/labour-supply.ts` and implemented by the host's
+population model. Both engines compile against it; `LabourProvider` (Settlement) and `LabourSupplyProvider`
+(Economy) are retired.
+
+```ts
+/** CONTRACTS.md s16. Person-hours per market and day. The host's population model implements it. */
+export interface LabourSupply {
+  /** Person-hours the market (or one of its pools) can still supply today for a role; null when the host does not know. */
+  hours(market: string, role: string, day: number, pool?: string, requires?: unknown): number | null
+  /** Take person-hours from the day's supply; returns what was granted (at most `hours`, at most what is left). */
+  draw(market: string, role: string, hours: number, day: number, pool?: string, requires?: unknown): number
+  /** False while a named person is aboard, dead or away: the host knows, the engines do not. */
+  available(person: string, day: number): boolean
+  /** Output per person-hour relative to a standard worker (0..n); the host maps skill bands to it. */
+  productivity(holder: string, role: string): number
+}
+```
+
+- **Settlement** reads `available` for named post holders and `draw` for pool-held posts and for projects; the
+  day's labour in a business is the sum of its filled posts' `hours x productivity` in person-hours; the labour
+  cap of a line is `hours / hoursPerUnit`. `Post.hours` stays per day; `Project.labourDays` becomes
+  `Project.labourHours`; a project's wage stays per day and pays `wage x hours / hoursPerDay`. Settlement never
+  draws more than `hours()` reports, and the host's `draw` enforces the day's cap across every business.
+- **Economy** reads `hours(market, role, day)` for its wage quote (workers equivalent = hours / `hoursPerDay`);
+  `MaterialProvider.rates(recipe)` returns `{ unitsPerFixtureDay, hoursPerUnit }` (person-hours per unit) in place
+  of `labourPerUnit` (worker-days): s13a amended. Recipe data converts once, `hoursPerUnit = labourPerUnit x
+  hoursPerDay`.
+- **The standard day** `hoursPerDay` is one config key the host sets for both engines: 10 today (proposed), 11
+  researched (SET-12, STARTING_TOWN.md Q10), Rex's to approve. It appears only where days and hours meet.
+- **Sharing across lines** (Q15, Rex): Settlement config `labourSharing: 'in-order'` (today's rule) is the only
+  accepted value until Rex answers; `'finite-hours'` (Rex's proposed answer) is reserved and throws "not decided".
+- **Acceptance tests:** (group 12) `cmp` of the two `labour-supply.ts` files; each engine's suite green against
+  one stub implementation (`StubLabourSupply`, the same class text in both). (group 10) Settlement **U18**: two
+  businesses and a project drawing from one pool on one day never exceed the stub's supply, and the drawn total
+  equals the sum of their caps; **U19**: with `hoursPerUnit = labourPerUnit x hoursPerDay` every production and
+  wage number of U7, U13, A1 and the hamlet is unchanged. Pirate **I3** (thirty days): on no day do assigned hours
+  exceed supplied hours in any market. Kernel units check: every labour quantity declares `h` (person-hours) or
+  `h/1` per unit. Economy: E-tests for `wageQuote` over hours unchanged in value.
+
+## 17. Wages: the level is Economy's, the payment Settlement's (DUP-28; PROPOSED by the settlement keeper 2026-10-30, not agreed)
+
+Rex approved (group 11): Economy's wage quote sets the level; Settlement's `pay` executes it, and `setWage` is the
+only channel by which a level reaches a post.
+
+- Economy's `wageQuote(market, role, day)` runs in `economy.tick`; the host (the pirate adapter's `runDay`) issues
+  `setWage(post, quote)` for every post of the role **only when the rule applies pressure**. Under the default
+  rule `posted-median` no `setWage` is issued, so today's ledger is unchanged. Which rule runs, and whether a quote
+  may move a post at all, is Rex's (STARTING_TOWN.md econ 6, Q10): a config key until then.
+- `Post.wage` is written by `setWage` and by `addPost` only; no tick writes it (Settlement **U17**).
+- Whether a payer may go into debt (balances may go negative today) is **open for Rex**, recorded here (s12 item
+  8), not decided; no rule is added.
+- **Acceptance tests:** pirate **I4a**: thirty days with `posted-median`, the ledger byte-identical to the run
+  without the wage channel; **I4b**: with the illustrative `ratio` rule, every change of a post's wage in the
+  ledger is preceded in the log by a `setWage` for that post, and each day's `wage` rows equal `Post.wage` at the
+  wages step. Settlement **U17** as above.
+
 ## Log
 
 | Date | What |
@@ -272,3 +334,4 @@ test: U16 (materials from `project.inventory`, wages from `project.account`, the
 | 2026-10-30 | Counter-proposal with inline amendments and §14 returned to the economy keeper (settlement keeper) |
 | 2026-10-30 | All nine amendments confirmed by the economy keeper; §13 a, b, c, e landed in Settlement with U13, U14; agreed |
 | 2026-10-30 | §15 (DUP-44, `Project.inventory`) proposed by the economy keeper, agreed and landed in Settlement with U16 |
+| 2026-10-30 | §16 (one LabourSupply interface, person-hours) and §17 (the wage channel) proposed by the settlement keeper for groups 10, 11, 12; sent to the economy keeper and Reality; not agreed |
