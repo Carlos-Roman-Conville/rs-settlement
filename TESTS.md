@@ -141,3 +141,11 @@ VAL-S1, VAL-C1, VAL-W1 and VAL-R1 wait for the starting data (Q10).
 - Command (the 2614 golden test, same as the 2615 compare): `npx --prefix <pirate>/web vitest run --root <pirate>/web src/economy/golden.test.ts`. The pirate Vite config resolves the shared settlement engine from `Toolchain/settlement`, so it ran against this HEAD.
 - Verdict: **byte-identical.** 1 test passed; the sorted-key JSON of economy, settlement, ledger, log, events and rows matches the golden exactly.
 - Differing fields: none. No difference to attribute to 2646 (already in the golden since 2651) or to 2654 (it dropped the spurious second `businessStatusChanged` event; the pirate thirty-day events are unchanged, so nothing moved).
+
+## Pirate golden after 2683
+
+- Settlement commit tested: `d2cc931` (Q20 prepass with in-order production, 2683; includes 2617 partial-hour pool posts).
+- Pirate commit: `75ec54f` (pirate 2618's settlement-side work as committed; its `economy.test.ts` type error is not exercised by this filtered run). Golden `web/src/economy/golden/thirty-days.json` unchanged by the run.
+- Command: `npx --prefix "E:/AI Programs/Games/RPG's/pirate-ship/web" vitest run --root "E:/AI Programs/Games/RPG's/pirate-ship/web" src/economy/golden.test.ts` (that one test only; the earlier heading did not run the full pirate suite).
+- Verdict: **byte-identical.** 1 test passed.
+- Differing fields: none. Nothing to attribute to 2617, 2618 or 2683.
