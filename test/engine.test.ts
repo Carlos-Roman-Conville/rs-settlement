@@ -362,6 +362,83 @@ describe('U14 pay and setWage are the ledger seam (CONTRACTS.md s3, s5, s13c, s1
   })
 })
 
+describe('U15 replay rebuilds the hamlet and A1 with the host providers', () => {
+  it('replays commands and three ticks with identical state, events and command results', () => {
+    function buildA1() {
+      const providers = stubProviders({
+        'salt-meat': { inputs: [{ good: 'meat', units: 1 }, { good: 'salt', units: 1 }], output: 'salt-meat', yield: 1, unitsPerFixtureDay: 10, labourPerUnit: 0.25 },
+        'smoked-meat': { inputs: [{ good: 'meat', units: 1 }], output: 'smoked-meat', yield: 1, unitsPerFixtureDay: 6, labourPerUnit: 0.25 },
+      })
+      providers.labour.pools['pool.housing'] = 5
+      providers.prices.values['bldg.0001'] = 60
+      const r = new Runner(initialState('stl.port', 'the port'), defaultConfig(), providers)
+      const dist = r.run<string>({ type: 'addDistrict', name: 'housing', kind: 'housing', bounds: { x: 0, y: 0, w: 40, h: 40 } })
+      const parcel = r.run<string>({ type: 'addParcel', district: dist, footprint: { x: 0, y: 0, w: 10, h: 10 }, access: ['road'] })
+      r.run({ type: 'grantTitle', subject: parcel, holder: 'esfp-f' })
+      providers.materials.set('esfp-f', 'timber', 20)
+      const build = r.run<string>({ type: 'startProject', kind: 'construct', target: parcel, account: 'esfp-f', labourDays: 0, materials: [{ material: 'timber', units: 10 }],
+        plan: { footprint: { x: 1, y: 1, w: 8, h: 6 }, addFixtures: ['salting-house'],
+          rooms: [{ id: 'shop', name: 'the shop', tiles: { x: 1, y: 1, w: 8, h: 4 }, use: 'work' }],
+          placements: [{ fixture: 'salting-house', room: 'shop', at: { x: 2, y: 2 } }] } })
+      r.tick()
+      const bldg = r.state.projects[build].result!
+      const title = r.run<string>({ type: 'grantTitle', subject: bldg, holder: 'esfp-f' })
+      r.run({ type: 'assign', person: 'esfp-f', kind: 'residence', target: bldg })
+      r.run({ type: 'assign', person: 'farm-son', kind: 'residence', target: bldg })
+      for (const holder of ['player', 'esfp-f', 'farm-son']) r.run({ type: 'credit', holder, amount: 100 })
+      r.run({ type: 'sell', title, buyer: 'player', price: providers.prices.valueOf(bldg, r.state.settlement.day) })
+      r.tick()
+      r.run({ type: 'transfer', title, to: 'farm-son', kind: 'gift' })
+      r.tick()
+      r.run({ type: 'lease', title, tenant: 'esfp-f', scope: ['shop'], rent: 2 })
+      const biz = r.run<string>({ type: 'openBusiness', kind: 'butcher', premises: [{ bldg, rooms: ['shop'] }],
+        operator: 'esfp-f', manager: 'farm-son', inventory: 'inv.butcher',
+        lines: [{ recipe: 'salt-meat', equipment: ['salting-house'] }, { recipe: 'smoked-meat', equipment: ['smokehouse'] }] })
+      r.run({ type: 'assign', person: 'farm-son', kind: 'management', target: biz })
+      r.run({ type: 'credit', holder: biz, amount: 100 })
+      r.tick()
+      const p1 = r.run<string>({ type: 'addPost', biz, role: 'butcher', wage: 2 })
+      const p2 = r.run<string>({ type: 'addPost', biz, role: 'labourer', wage: 1 })
+      r.run({ type: 'hire', post: p1, holder: 'esfp-f' })
+      r.run({ type: 'hire', post: p2, holder: 'pool.housing' })
+      r.tick()
+      providers.labour.pools['pool.builders'] = 1
+      providers.materials.set('esfp-f', 'timber', 10)
+      r.run({ type: 'startProject', kind: 'renovate', target: bldg, account: 'esfp-f', pool: 'pool.builders', wage: 1, labourDays: 2,
+        materials: [{ material: 'timber', units: 5 }],
+        plan: { rooms: [{ id: 'back', name: 'back room', tiles: { x: 1, y: 5, w: 8, h: 2 }, use: 'smoke' }],
+          addFixtures: ['smokehouse'], placements: [{ fixture: 'smokehouse', room: 'back', at: { x: 2, y: 5 } }] } })
+      r.tick(2)
+      providers.materials.set('inv.butcher', 'meat', 100)
+      providers.materials.set('inv.butcher', 'salt', 100)
+      return { r, providers }
+    }
+
+    for (const build of [buildHamlet, buildA1]) {
+      const { r, providers } = build()
+      const from = structuredClone(r.state)
+      const fromBefore = structuredClone(from)
+      // Host setup writes stores outside the log. Rebuild it at the same boundary,
+      // before any of the three ticks consumes those stores.
+      const rebuilt = build()
+      r.log.length = 0
+      r.events.length = 0
+      const district = r.run<string>({ type: 'addDistrict', name: 'extension', kind: 'housing', bounds: { x: 60, y: 0, w: 10, h: 10 } })
+      expect(r.state.districts[district].name).toBe('extension')
+      r.tick(3)
+      const log = structuredClone(r.log)
+      const replayed = Runner.replay(log, r.config, rebuilt.providers, from)
+      expect(replayed).toBeInstanceOf(Runner)
+      expect(replayed.state).toEqual(r.state)
+      expect(replayed.events).toEqual(r.events)
+      expect(replayed.log).toEqual(log)
+      expect(rebuilt.providers.materials.stock).toEqual(providers.materials.stock)
+      expect(from).toEqual(fromBefore)
+      expect(log).toEqual(r.log)
+    }
+  })
+})
+
 describe('U16 a project draws materials from its own inventory ref, not from its payer (DUP-44)', () => {
   it('materials come from project.inventory; wages come from project.account', () => {
     const ctx = fresh()

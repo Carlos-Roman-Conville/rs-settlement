@@ -3,13 +3,14 @@
 // mutable stores (inventories): a throw after a provider call is the host's to roll back, which is why every
 // command validates before it calls a provider.
 
+import { Runner as KernelRunner, type Reducer } from '@rex/kernel'
 import * as handlers from './commands.ts'
 import type { Command } from './commands.ts'
 import { defaultConfig, type SettlementConfig } from './config.ts'
 import type { Ctx } from './context.ts'
 import type { SettlementEvent } from './events.ts'
 import { stubProviders, type Providers } from './providers.ts'
-import type { SettlementState } from './state.ts'
+import { initialState, type SettlementState } from './state.ts'
 import { tick } from './tick/index.ts'
 
 export interface ReduceResult { state: SettlementState; events: SettlementEvent[]; result: unknown }
@@ -69,24 +70,28 @@ export function reduce(state: SettlementState, command: Command, config: Settlem
   return { state: ctx.state, events: ctx.events, result }
 }
 
+// Narrow the base constructor so the engine can expose its own replay signature.
+const RunnerBase: new (state: SettlementState, reduce: Reducer<SettlementState, Command, ReduceResult>) =>
+  KernelRunner<SettlementState, Command, ReduceResult, SettlementEvent> = KernelRunner
+
 /** A small driver for scripts and tests: keeps the state, returns each command's result, collects events. */
-export class Runner {
-  events: SettlementEvent[] = []
-  log: Command[] = []
-  state: SettlementState
+export class Runner extends RunnerBase {
   config: SettlementConfig
   providers: Providers
   constructor(state: SettlementState, config: SettlementConfig = defaultConfig(), providers: Providers = stubProviders()) {
-    this.state = state
+    super(state, (state, command) => reduce(state, command, this.config, this.providers))
     this.config = config
     this.providers = providers
   }
   run<T = unknown>(command: Command): T {
-    const out = reduce(this.state, command, this.config, this.providers)
-    this.state = out.state
-    this.events.push(...out.events)
-    this.log.push(structuredClone(command))
-    return out.result as T
+    return super.run(command).result as T
   }
   tick(days = 1): void { for (let i = 0; i < days; i++) this.run({ type: 'tick' }) }
+  /** Supply the starting state (including its identity) and providers rebuilt at that same log boundary. */
+  static replay(log: readonly Command[], config: SettlementConfig = defaultConfig(), providers: Providers = stubProviders(),
+    from: SettlementState = initialState('stl.main', 'Settlement')): Runner {
+    const runner = new Runner(structuredClone(from), config, providers)
+    for (const command of log) runner.run(structuredClone(command))
+    return runner
+  }
 }
