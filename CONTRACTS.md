@@ -212,7 +212,7 @@ assignment; every rule Rex has not decided is a config key or an open item in th
 4. Is named characters' spending simulated, or only pools' (§5)?
 5. The price formula and its constants (§7): a config key until then.
 6. Wage levels per trade (Settlement Q10) and whether a market wage quote may move them.
-8. (settlement, added 2026-10-30, s17) May a payer go into debt, or does an unpaid wage stall the post?
+8. (settlement, added 2026-10-30, s16 wages) May a payer go into debt, or does an unpaid wage stall the post?
 7. (settlement, added) Does an idle fixture count for "the settlement has it" (Settlement Q9; the reader's
    `hasFixture` default is yes)?
 
