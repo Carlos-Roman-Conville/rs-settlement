@@ -107,3 +107,20 @@ ledger row (Q6).
 A second run of the same script with the settlement engine **absent** (the adapter's bridge disabled) produces
 the same alignment trace; a run of the package's `examples/` hamlet with the same command kinds and no pirate
 data passes U1 to U12. That is the reuse proof.
+
+## Validation (`test/validation.test.ts`; the spec is `VALIDATION.md`)
+
+Stability, conservation and boundary rows (V) and validation against evidence (VAL), one `describe` per row.
+
+| Id | Must hold |
+|---|---|
+| V1 | the hamlet run for 365 ticks keeps `totalMoney` exactly, after every tick |
+| V2 | two runners built the same way give identical business statuses on each of 30 ticks |
+| V3 | Q is monotone non-decreasing in fixtures, filled-post hours, materials and the utility cap, and 0 when any is 0 |
+| V4 | a recipe with no inputs never yields an infinite or NaN Q; `production[biz]` holds finite numbers only |
+| V6 | condition stays in [0, 1], falls monotonically over 1,000 ticks without repair, never below 0; a completed repair raises it |
+| V7 | a project draws exactly the materials it names, once; a cancelled project draws nothing afterwards |
+| VAL-D1 | `it.todo`: years from new to ruined by material class within sourced ranges (SET-20; model change under review) |
+| VAL-D1a | the days from condition 1 to the ruined band, summed from `defaultConfig().bands`, are 850 |
+
+V5 waits for P1. VAL-S1, VAL-C1, VAL-W1 and VAL-R1 wait for the starting data (Q10).
