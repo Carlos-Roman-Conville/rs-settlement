@@ -124,3 +124,11 @@ Stability, conservation and boundary rows (V) and validation against evidence (V
 | VAL-D1, VAL-D1a | sourced material lifetimes reach ruin within 1%; unclassified buildings keep their condition for 1,000 ticks and are listed by `unvalidatedDecay`; null classes and exposures are flagged |
 
 V5 waits for P1. VAL-S1, VAL-C1, VAL-W1 and VAL-R1 wait for the starting data (Q10).
+
+## Pirate golden after 2654
+
+- Settlement commit tested: `8dc8fcb` (one status writer, SET-21; includes 2646 decay classes at `79a848a`).
+- Pirate golden: `Games/RPG's/pirate-ship/web/src/economy/golden/thirty-days.json` (last re-recorded by pirate 2651, `35c8b3d`, for decay classes and exposure; CHANGES.md lists only that entry). Pirate working tree for `web/src/economy` clean.
+- Command (the 2614 golden test, same as the 2615 compare): `npx --prefix <pirate>/web vitest run --root <pirate>/web src/economy/golden.test.ts`. The pirate Vite config resolves the shared settlement engine from `Toolchain/settlement`, so it ran against this HEAD.
+- Verdict: **byte-identical.** 1 test passed; the sorted-key JSON of economy, settlement, ledger, log, events and rows matches the golden exactly.
+- Differing fields: none. No difference to attribute to 2646 (already in the golden since 2651) or to 2654 (it dropped the spurious second `businessStatusChanged` event; the pirate thirty-day events are unchanged, so nothing moved).
