@@ -55,6 +55,8 @@ the heir of an `inherit` is named by the host (no law of succession); offices gr
 5. [QUESTIONS.md](QUESTIONS.md): what only Rex can answer, and what is assumed meanwhile.
 6. [CONTRACTS.md](CONTRACTS.md): the Settlement-Economy contract (ledger, materials, rates, the reader, the day
    order), agreed with the economy keeper 2026-10-30; both repos hold the same text.
+7. [VALIDATION.md](VALIDATION.md): per mechanism, the model and its evidence level, the tests that verify it,
+   the evidence it is validated against and the report (Rex's V&V directive, PLATFORM.md §11a).
 
 ## Marks
 
