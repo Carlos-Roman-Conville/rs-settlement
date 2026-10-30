@@ -1,0 +1,39 @@
+{
+  "processes": [
+    {
+      "id": "settlement.tick",
+      "mechanisms": [
+        "settlement.infra.tick_scheduler",
+        "settlement.expiry",
+        "settlement.building.condition_decay",
+        "settlement.business.staffing",
+        "settlement.production.equipment_cap",
+        "settlement.production.labour_cap",
+        "settlement.production.constraint_Q",
+        "settlement.wage.pay",
+        "settlement.project.construction"
+      ],
+      "writes": [
+        "settlement.status_changes",
+        "settlement.condition",
+        "settlement.post_filledby",
+        "settlement.business_status_dormant_staffed_producing",
+        "settlement.labour.hours_assigned",
+        "settlement.q_units_per_line_per_day",
+        "settlement.production_record",
+        "settlement.business_status",
+        "settlement.project.labour_hours",
+        "settlement.new_changed_building_layout_version",
+        "settlement.ticktrace"
+      ],
+      "reads": [
+        "settlement.condition",
+        "settlement.post_filledby"
+      ],
+      "period": 86400000,
+      "phase": "day.settlement"
+    }
+  ],
+  "ports": [],
+  "streams": []
+}
