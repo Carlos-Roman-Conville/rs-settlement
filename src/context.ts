@@ -1,6 +1,7 @@
 // The working context of one reduce call: a deep copy of the state (so a throw leaves the caller's state
 // untouched), the config, the providers and the events collected so far. Helpers every command and tick step share.
 
+import { finite, must, nonempty } from '@rex/kernel'
 import type { SettlementConfig } from './config.ts'
 import type { SettlementEvent } from './events.ts'
 import { mint, type Prefix } from './ids.ts'
@@ -21,10 +22,7 @@ export function newId(ctx: Ctx, prefix: Prefix): string {
   return minted.id
 }
 
-export function must<T>(table: Record<string, T>, id: string, what: string): T {
-  if (!Object.hasOwn(table, id)) throw new Error(`unknown ${what}: ${id}`)
-  return table[id]
-}
+export { must, nonempty, finite }
 
 export const parcel = (ctx: Ctx, id: string): Parcel => must(ctx.state.parcels, id, 'parcel')
 export const building = (ctx: Ctx, id: string): Building => must(ctx.state.buildings, id, 'building')
@@ -33,16 +31,6 @@ export const lease = (ctx: Ctx, id: string): Lease => must(ctx.state.leases, id,
 export const business = (ctx: Ctx, id: string): Business => must(ctx.state.businesses, id, 'business')
 export const post = (ctx: Ctx, id: string): Post => must(ctx.state.posts, id, 'post')
 export const project = (ctx: Ctx, id: string): Project => must(ctx.state.projects, id, 'project')
-
-export function nonempty(value: unknown, what: string): string {
-  if (typeof value !== 'string' || !value.trim()) throw new Error(`${what} must be a non-empty string`)
-  return value
-}
-
-export function finite(value: unknown, what: string, min = Number.NEGATIVE_INFINITY): number {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < min) throw new Error(`${what} must be a number >= ${min}`)
-  return value
-}
 
 /** The account of a holder, created with a zero balance when first needed (deterministic on replay). */
 export function accountOf(ctx: Ctx, holder: string): Account {
