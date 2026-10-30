@@ -18,7 +18,7 @@ export function production(ctx: Ctx): void {
     }
     const lines: { recipe: string; q: number; caps: Record<string, number> }[] = []
     let produced = false
-    for (const line of biz.lines) {
+    for (const [lineIndex, line] of biz.lines.entries()) {
       const rates = materials.rates(line.recipe)
       const unitsPerFixtureDay = checked(rates.unitsPerFixtureDay, `rates(${line.recipe}).unitsPerFixtureDay`, 0)
       const labourHoursPerUnit = checked(rates.labourHoursPerUnit, `rates(${line.recipe}).labourHoursPerUnit`, 0)
@@ -38,6 +38,7 @@ export function production(ctx: Ctx): void {
       let utility = Number.POSITIVE_INFINITY
       for (const premises of biz.premises) utility = Math.min(utility, utilities.capacity(premises.bldg, line.recipe, ctx.state))
       const q = Math.max(0, Math.floor(Math.min(equipment, labourCap, materialCap, utility)))
+      if (!Number.isFinite(q)) throw new Error(`open for Rex (Q20): non-finite production Q for business ${biz.id}, line ${lineIndex + 1}, recipe ${line.recipe}`)
       const finite = (value: number) => (Number.isFinite(value) ? value : -1)
       lines.push({ recipe: line.recipe, q, caps: { equipment: finite(equipment), labour: finite(labourCap), materials: finite(materialCap), utilities: finite(utility) } })
       if (q > 0) {

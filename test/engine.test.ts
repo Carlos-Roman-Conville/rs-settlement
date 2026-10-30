@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import ts from 'typescript'
 import { Runner } from '../src/reduce.ts'
 import { initialState } from '../src/state.ts'
 import { defaultConfig } from '../src/config.ts'
@@ -520,8 +521,26 @@ describe('U17 setWage is the only channel for a wage level', () => {
       readdirSync(dir: string): string[]
     }
     const files = ['src/commands.ts', ...readdirSync('src/tick').map((name) => `src/tick/${name}`)]
-    const sites = files.flatMap((file) => (readFileSync(file, 'utf8').match(/\.wage\s*=[^=]|\bwage:\s*finite\(c\.wage,/g) ?? []).map(() => file))
-    expect(sites).toEqual(['src/commands.ts', 'src/commands.ts'])
+    const sites = files.flatMap((file) => {
+      const source = readFileSync(file, 'utf8')
+      const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true)
+      return [...source.matchAll(/\.wage\s*=[^=]|\bwage:\s*finite\(c\.wage,/g)].map((match) => {
+        let functionName: string | undefined
+        const visit = (node: ts.Node): void => {
+          if (match.index < node.getStart(parsed) || match.index >= node.end) return
+          if (ts.isFunctionLike(node)) {
+            functionName = ts.isFunctionDeclaration(node) ? node.name?.text : undefined
+          }
+          ts.forEachChild(node, visit)
+        }
+        visit(parsed)
+        return { file, functionName }
+      })
+    })
+    expect(sites).toEqual([
+      { file: 'src/commands.ts', functionName: 'addPost' },
+      { file: 'src/commands.ts', functionName: 'setWage' },
+    ])
   })
 })
 

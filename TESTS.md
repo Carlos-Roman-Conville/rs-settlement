@@ -4,6 +4,8 @@ Specs, not code. Each names where it lives, what it sets up, what it does and wh
 (U) run with none of pirate-ship on disk; adapter tests (T, A) run in the pirate repo's `web/` under vitest
 beside `src/alignment/`. Every number in a setup is a test fixture, not a game rule.
 
+V4 and U17 are now strict: all-Infinity production throws before inventory changes, and wage writer sites must belong to `addPost` and `setWage` by name.
+
 ## The guard
 
 **T0, alignment invariance** (adapter; written first, run at every migration step).
