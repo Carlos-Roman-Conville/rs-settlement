@@ -18,7 +18,7 @@ export interface ReduceResult { state: SettlementState; events: SettlementEvent[
 export function reduce(state: SettlementState, command: Command, config: SettlementConfig = defaultConfig(),
   providers: Providers = stubProviders()): ReduceResult {
   if (!command || typeof command !== 'object' || typeof (command as { type?: unknown }).type !== 'string') throw new Error('invalid command')
-  const ctx: Ctx = { state: structuredClone(state), config, providers, events: [] }
+  const ctx: Ctx = { state: structuredClone(state), config, providers, events: [], staffed: new Set() }
   let result: unknown = undefined
   switch (command.type) {
     case 'addDistrict': result = handlers.addDistrict(ctx, command); break

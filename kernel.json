@@ -17,11 +17,10 @@
         "settlement.status_changes",
         "settlement.condition",
         "settlement.post_filledby",
-        "settlement.business_status_dormant_staffed_producing",
+        "settlement.business.status",
         "settlement.labour.hours_assigned",
         "settlement.q_units_per_line_per_day",
         "settlement.production_record",
-        "settlement.business_status",
         "settlement.project.labour_hours",
         "settlement.new_changed_building_layout_version",
         "settlement.ticktrace"

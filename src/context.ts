@@ -14,6 +14,8 @@ export interface Ctx {
   config: SettlementConfig
   providers: Providers
   events: SettlementEvent[]
+  /** The day's staffing outcome (business ids); tick context only, never saved in the state. */
+  staffed: Set<string>
 }
 
 export function newId(ctx: Ctx, prefix: Prefix): string {

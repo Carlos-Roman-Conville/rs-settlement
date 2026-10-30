@@ -30,6 +30,7 @@ alignment command the `AlignmentState` JSON is byte-identical to a run without t
 | U9 | construction mints and demolition retires | `construct` on a vacant parcel mints a `bldg.*` and sets `vacant: false`; `demolish` sets `demolishedOn`, keeps the title history, frees the parcel |
 | U10 | authority is data | an office with `powers: [permit]` can `grantPermission`; one without is refused; a project whose `needs.permit` is true cannot start without one; appointment and vacancy are ledger rows |
 | U11 | tick order | the seven tick steps run in the declared order (a trace lists them); a project completed in step 2 is staffable in step 3 of the same day, which is the stated behaviour, not an accident |
+| U21 | one status writer, one event per change | the hamlet emits exactly one `businessStatusChanged` in ten days; a business that loses its only worker on day 5 emits exactly one more; only the production step writes `Business.status` in the tick (SET-21, REG-16) |
 | U12 | the engine names nobody | every person id in a state came from a command; `LabourProvider.draw` returns pool ids, never a person the host did not register |
 
 ## Adapter tests (`Games/RPG's/pirate-ship/web/src/settlement/*.test.ts`)

@@ -462,6 +462,22 @@ describe('U16 a project draws materials from its own inventory ref, not from its
   })
 })
 
+describe('U21 one status writer, one event per change (SET-21, REG-16)', () => {
+  it('the hamlet emits one businessStatusChanged in ten days; losing the only worker on day 5 emits one more', () => {
+    const { r, ids } = buildHamlet()
+    r.events.length = 0
+    const changes = () => r.events.filter((event) => event.type === 'businessStatusChanged' && event.biz === ids.biz)
+    r.tick(4)
+    expect(changes()).toHaveLength(1)
+    expect(r.state.businesses[ids.biz].status).toBe('producing')
+    r.run({ type: 'dismiss', post: ids.post })
+    r.tick(6)
+    expect(changes()).toHaveLength(2)
+    expect(r.state.businesses[ids.biz].status).toBe('dormant')
+    expect(r.state.production[ids.biz]).toBeUndefined()
+  })
+})
+
 describe('the hamlet example (reuse proof)', () => {
   it('builds, staffs and produces with no game data', () => {
     const { r, providers, ids } = buildHamlet()

@@ -8,7 +8,7 @@ export function production(ctx: Ctx): void {
   const { labour, materials, utilities } = ctx.providers
   const day = ctx.state.settlement.day
   for (const biz of Object.values(ctx.state.businesses)) {
-    if (biz.status !== 'staffed' && biz.status !== 'producing') { delete ctx.state.production[biz.id]; continue }
+    if (!biz.open || !ctx.staffed.has(biz.id)) { delete ctx.state.production[biz.id]; setStatus(ctx, biz.id, 'dormant'); continue }
     let labourDays = 0
     for (const id of biz.posts) {
       const post = ctx.state.posts[id]
