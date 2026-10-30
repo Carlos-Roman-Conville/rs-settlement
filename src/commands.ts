@@ -25,7 +25,7 @@ export type Command =
   | { type: 'setRent'; lease: string; rent: number }
   // building
   | { type: 'addBuilding'; decayClass?: string; exposure?: string; parcel: string; footprint: Rect; storeys?: number; condition?: number; rooms?: Room[]; placements?: Placement[]; fixtures?: string[] }
-  | { type: 'startProject'; kind: ProjectKind; target: string; plan?: ProjectPlan; materials?: { material: string; units: number }[]; labourDays?: number; pool?: string; wage?: number; account: string; inventory?: string; permitRequired?: boolean; permit?: string | null }
+  | { type: 'startProject'; kind: ProjectKind; target: string; plan?: ProjectPlan; materials?: { material: string; units: number }[]; labourHours?: number; pool?: string; wage?: number; account: string; inventory?: string; permitRequired?: boolean; permit?: string | null }
   | { type: 'advanceProject'; project: string; workerDays: number }
   | { type: 'cancelProject'; project: string }
   | { type: 'setLayout'; bldg: string; layout: Omit<Layout, 'version'>; by: string }
@@ -38,6 +38,7 @@ export type Command =
   | { type: 'closeBusiness'; biz: string }
   | { type: 'setOperator'; biz: string; operator: string }
   | { type: 'setManager'; biz: string; manager: string | null }
+  | { type: 'setInventory'; biz: string; inventory: string }
   | { type: 'setLines'; biz: string; lines: ProductionLine[] }
   | { type: 'setPublicWorks'; biz: string; publicWorks: boolean }
   | { type: 'addPost'; biz: string; role: string; requires?: unknown; wage: number; hours?: number; required?: boolean }
@@ -333,7 +334,7 @@ export function startProject(ctx: Ctx, c: Extract<Command, { type: 'startProject
   const id = newId(ctx, 'proj')
   ctx.state.projects[id] = { id, kind: c.kind, target: c.target, plan: structuredClone(plan),
     materials: (c.materials ?? []).map((item) => ({ material: nonempty(item.material, 'material'), units: finite(item.units, 'units', 0) })),
-    labourDays: finite(c.labourDays ?? 0, 'labourDays', 0), pool: c.pool ?? 'pool.default', wage: finite(c.wage ?? 0, 'wage', 0),
+    labourHours: finite(c.labourHours ?? 0, 'labourHours', 0), pool: c.pool ?? 'pool.default', wage: finite(c.wage ?? 0, 'wage', 0),
     account: nonempty(c.account, 'account'), inventory: nonempty(c.inventory ?? c.account, 'inventory'), permitRequired: !!c.permitRequired, permit: c.permit ?? null,
     materialsDrawn: (c.materials ?? []).length === 0, progress: 0, status: 'active', result: null }
   return id
@@ -357,7 +358,7 @@ function checkPlacements(rooms: Room[], placements: Placement[], fixtures: strin
   }
 }
 
-/** Apply a completed project's plan. Called by the tick (or by advanceProject) when progress reaches labourDays. */
+/** Apply a completed project's plan. Called by the tick (or by advanceProject) when progress reaches labourHours. */
 export function completeProject(ctx: Ctx, id: string): void {
   const entry = project(ctx, id)
   if (entry.status !== 'active') return
@@ -433,8 +434,8 @@ export function advanceProject(ctx: Ctx, c: Extract<Command, { type: 'advancePro
   if (!entry.materialsDrawn) throw new Error('materials not yet drawn: tick first, or supply them')
   const days = finite(c.workerDays, 'workerDays', 0)
   if (entry.wage > 0 && days > 0) pay(ctx, entry.account, entry.pool, entry.wage * days, 'wage', entry.id)
-  entry.progress += days
-  if (entry.progress >= entry.labourDays) completeProject(ctx, entry.id)
+  entry.progress += days * ctx.config.hoursPerDay
+  if (entry.progress >= entry.labourHours) completeProject(ctx, entry.id)
 }
 
 function layoutAuthority(ctx: Ctx, bldgId: string, by: string): void {
@@ -655,4 +656,9 @@ export function debit(ctx: Ctx, c: Extract<Command, { type: 'debit' }>): void {
 /** Move money between holders under the caller's kind (CONTRACTS.md s3, s13e): the economy's LedgerProvider.transfer. Returns the row id. */
 export function payCommand(ctx: Ctx, c: Extract<Command, { type: 'pay' }>): string {
   return pay(ctx, nonempty(c.from, 'from'), nonempty(c.to, 'to'), finite(c.amount, 'amount', 0), nonempty(c.kind, 'kind'), c.subject ?? null, null, c.note ?? '')
+}
+
+export function setInventory(ctx: Ctx, c: Extract<Command, { type: 'setInventory' }>): void {
+  const biz = business(ctx, c.biz)
+  biz.inventory = nonempty(c.inventory, 'inventory')
 }

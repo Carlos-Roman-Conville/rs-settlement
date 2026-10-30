@@ -10,8 +10,8 @@ import { assignmentsOf, economic, holderOf, ledger, physical, totalMoney } from 
 
 describe('A1 (engine): the butcher shop changes hands, is leased, staffed, renovated and produces', () => {
   const providers = stubProviders({
-    'salt-meat': { inputs: [{ good: 'meat', units: 1 }, { good: 'salt', units: 1 }], output: 'salt-meat', yield: 1, unitsPerFixtureDay: 10, labourPerUnit: 0.25 },
-    'smoked-meat': { inputs: [{ good: 'meat', units: 1 }], output: 'smoked-meat', yield: 1, unitsPerFixtureDay: 6, labourPerUnit: 0.25 },
+    'salt-meat': { inputs: [{ good: 'meat', units: 1 }, { good: 'salt', units: 1 }], output: 'salt-meat', yield: 1, unitsPerFixtureDay: 10, labourHoursPerUnit: 2.5 },
+    'smoked-meat': { inputs: [{ good: 'meat', units: 1 }], output: 'smoked-meat', yield: 1, unitsPerFixtureDay: 6, labourHoursPerUnit: 2.5 },
   })
   providers.labour.pools['pool.housing'] = 5
   providers.prices.values['bldg.0001'] = 60
@@ -20,7 +20,7 @@ describe('A1 (engine): the butcher shop changes hands, is leased, staffed, renov
   const parcel = r.run<string>({ type: 'addParcel', district: dist, footprint: { x: 0, y: 0, w: 10, h: 10 }, access: ['road'] })
   r.run({ type: 'grantTitle', subject: parcel, holder: 'esfp-f' })
   providers.materials.set('esfp-f', 'timber', 20)
-  const build = r.run<string>({ type: 'startProject', kind: 'construct', target: parcel, account: 'esfp-f', labourDays: 0, materials: [{ material: 'timber', units: 10 }],
+  const build = r.run<string>({ type: 'startProject', kind: 'construct', target: parcel, account: 'esfp-f', labourHours: 0, materials: [{ material: 'timber', units: 10 }],
     plan: { footprint: { x: 1, y: 1, w: 8, h: 6 }, addFixtures: ['salting-house'],
       rooms: [{ id: 'shop', name: 'the shop', tiles: { x: 1, y: 1, w: 8, h: 4 }, use: 'work' }],
       placements: [{ fixture: 'salting-house', room: 'shop', at: { x: 2, y: 2 } }] } })
@@ -69,7 +69,7 @@ describe('A1 (engine): the butcher shop changes hands, is leased, staffed, renov
   it('5. a renovation adds a smokehouse in a new back room, paid by the operator', () => {
     providers.labour.pools['pool.builders'] = 1
     providers.materials.set('esfp-f', 'timber', 10)
-    const proj = r.run<string>({ type: 'startProject', kind: 'renovate', target: bldg, account: 'esfp-f', pool: 'pool.builders', wage: 1, labourDays: 2,
+    const proj = r.run<string>({ type: 'startProject', kind: 'renovate', target: bldg, account: 'esfp-f', pool: 'pool.builders', wage: 1, labourHours: 20,
       materials: [{ material: 'timber', units: 5 }],
       plan: { rooms: [{ id: 'back', name: 'back room', tiles: { x: 1, y: 5, w: 8, h: 2 }, use: 'smoke' }], addFixtures: ['smokehouse'],
         placements: [{ fixture: 'smokehouse', room: 'back', at: { x: 2, y: 5 } }] } })

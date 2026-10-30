@@ -124,7 +124,7 @@ export interface Post {
   id: string
   biz: string
   role: string              // opaque occupation id
-  requires: unknown         // evaluated by the LabourProvider
+  requires: unknown         // evaluated by the LabourSupply
   wage: number              // per day
   hours: number             // per day
   required: boolean         // the business is dormant while a required post is unfilled
@@ -165,7 +165,7 @@ export interface Project {
   target: string            // a parcel or building id
   plan: ProjectPlan
   materials: { material: string; units: number }[]
-  labourDays: number
+  labourHours: number
   pool: string              // where labour is drawn from
   wage: number              // per worker-day
   account: string           // who pays (a holder id)

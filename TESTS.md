@@ -31,6 +31,9 @@ alignment command the `AlignmentState` JSON is byte-identical to a run without t
 | U10 | authority is data | an office with `powers: [permit]` can `grantPermission`; one without is refused; a project whose `needs.permit` is true cannot start without one; appointment and vacancy are ledger rows |
 | U11 | tick order | the seven tick steps run in the declared order (a trace lists them); a project completed in step 2 is staffable in step 3 of the same day, which is the stated behaviour, not an accident |
 | U21 | one status writer, one event per change | the hamlet emits exactly one `businessStatusChanged` in ten days; a business that loses its only worker on day 5 emits exactly one more; only the production step writes `Business.status` in the tick (SET-21, REG-16) |
+| U18 | finite person-hours | two businesses and a project share daily pool grants without exceeding supply; unsupported labourSharing names Q15 |
+| U19 | conversion preserves results | U7, U8, U13, U16, A1 and hamlet production, wages and projects retain their expected numbers |
+| U20 | inventory rebinding | setInventory validates the business and ref; the next tick consumes the new inventory |
 | U12 | the engine names nobody | every person id in a state came from a command; `LabourProvider.draw` returns pool ids, never a person the host did not register |
 
 ## Adapter tests (`Games/RPG's/pirate-ship/web/src/settlement/*.test.ts`)
@@ -119,11 +122,12 @@ Stability, conservation and boundary rows (V) and validation against evidence (V
 | V2 | two runners built the same way give identical business statuses on each of 30 ticks |
 | V3 | Q is monotone non-decreasing in fixtures, filled-post hours, materials and the utility cap, and 0 when any is 0 |
 | V4 | a recipe with no inputs never yields an infinite or NaN Q; `production[biz]` holds finite numbers only |
+| V5 | 30 hamlet ticks conserve hours across lines and projects, never exceeding daily supply |
 | V6 | condition stays in [0, 1], falls monotonically over 1,000 ticks without repair, never below 0; a completed repair raises it |
 | V7 | a project draws exactly the materials it names, once; a cancelled project draws nothing afterwards |
 | VAL-D1, VAL-D1a | sourced material lifetimes reach ruin within 1%; unclassified buildings keep their condition for 1,000 ticks and are listed by `unvalidatedDecay`; null classes and exposures are flagged |
 
-V5 waits for P1. VAL-S1, VAL-C1, VAL-W1 and VAL-R1 wait for the starting data (Q10).
+VAL-S1, VAL-C1, VAL-W1 and VAL-R1 wait for the starting data (Q10).
 
 ## Pirate golden after 2654
 

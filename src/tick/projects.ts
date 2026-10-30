@@ -1,5 +1,5 @@
 // Step 2: active projects draw their materials (all or nothing, from the project's inventory ref; the payer's
-// account is a separate field), then labour from their pool, pay wages, and complete when the labour days are done.
+// account is a separate field), then labour from their pool, pay wages, and complete when the labour hours are done.
 import { completeProject } from '../commands.ts'
 import { pay, type Ctx } from '../context.ts'
 
@@ -17,15 +17,14 @@ export function projects(ctx: Ctx): void {
       entry.materialsDrawn = true
     }
     if (entry.permitRequired && !entry.permit) continue
-    const wanted = entry.labourDays - entry.progress
+    const wanted = entry.labourHours - entry.progress
     if (wanted > 0) {
-      const workers = ctx.providers.labour.draw(entry.pool, 'labourer', null, Math.ceil(wanted), day)
-      const days = Math.min(wanted, workers)
-      if (days > 0) {
-        if (entry.wage > 0) pay(ctx, entry.account, entry.pool, entry.wage * days, 'wage', entry.id)
-        entry.progress += days
+      const hours = ctx.providers.labour.draw(entry.pool, 'labourer', null, wanted, day)
+      if (hours > 0) {
+        if (entry.wage > 0) pay(ctx, entry.account, entry.pool, entry.wage * hours / ctx.config.hoursPerDay, 'wage', entry.id)
+        entry.progress += hours
       }
     }
-    if (entry.progress >= entry.labourDays) completeProject(ctx, entry.id)
+    if (entry.progress >= entry.labourHours) completeProject(ctx, entry.id)
   }
 }

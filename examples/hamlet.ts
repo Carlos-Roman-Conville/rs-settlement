@@ -7,7 +7,7 @@ import { defaultConfig } from '../src/config.ts'
 
 export function buildHamlet() {
   const providers = stubProviders({
-    'plank': { inputs: [{ good: 'log', units: 1 }], output: 'plank', yield: 4, unitsPerFixtureDay: 5, labourPerUnit: 0.5 },
+    'plank': { inputs: [{ good: 'log', units: 1 }], output: 'plank', yield: 4, unitsPerFixtureDay: 5, labourHoursPerUnit: 5 },
   })
   providers.labour.pools['pool.hamlet'] = 3
   const r = new Runner(initialState('stl.hamlet', 'The hamlet'), defaultConfig(), providers)
@@ -22,10 +22,10 @@ export function buildHamlet() {
   r.run({ type: 'credit', holder: 'town', amount: 100 })
   providers.materials.set('alder', 'timber', 20)
   const house = r.run<string>({ type: 'startProject', kind: 'construct', target: p1, account: 'alder', pool: 'pool.hamlet', wage: 1,
-    labourDays: 2, materials: [{ material: 'timber', units: 10 }],
+    labourHours: 20, materials: [{ material: 'timber', units: 10 }],
     plan: { footprint: { x: 1, y: 1, w: 6, h: 5 }, rooms: [{ id: 'hall', name: 'hall', tiles: { x: 1, y: 1, w: 6, h: 5 }, use: 'living' }] } })
   const shop = r.run<string>({ type: 'startProject', kind: 'construct', target: p2, account: 'alder', pool: 'pool.hamlet', wage: 1,
-    labourDays: 2, materials: [{ material: 'timber', units: 10 }],
+    labourHours: 20, materials: [{ material: 'timber', units: 10 }],
     plan: { footprint: { x: 13, y: 1, w: 8, h: 6 }, addFixtures: ['saw-pit'],
       rooms: [{ id: 'floor', name: 'the floor', tiles: { x: 13, y: 1, w: 8, h: 6 }, use: 'work' }],
       placements: [{ fixture: 'saw-pit', room: 'floor', at: { x: 14, y: 2 } }] } })

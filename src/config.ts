@@ -10,6 +10,7 @@ export interface SettlementConfig {
   decayShares: Record<string, number> // proposed, level-5 band shape (VALIDATION section 4b)
   freeLayout: boolean             // may a title holder setLayout without a project (Q8; default no)
   hoursPerDay: number             // a full post's day, for labour arithmetic
+  labourSharing: string          // proposed: in-order until Rex answers Q15
   tickOrder: readonly string[]
 }
 
@@ -36,6 +37,7 @@ export function defaultConfig(): SettlementConfig {
     decayShares: { fine: 400 / 850, sound: 300 / 850, poor: 150 / 850 },
     freeLayout: false,
     hoursPerDay: 10,
+    labourSharing: 'in-order',
     tickOrder: TICK_ORDER,
   }
 }

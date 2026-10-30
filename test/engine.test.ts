@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { Runner } from '../src/reduce.ts'
 import { initialState } from '../src/state.ts'
 import { defaultConfig } from '../src/config.ts'
-import { stubProviders } from '../src/providers.ts'
+import { stubProviders, StubLabour, StubLabourSupply } from '../src/providers.ts'
 import { assignmentsOf, balanceOf, hasFixture, holderOf, ledger, physical, tenantsOf, totalMoney } from '../src/queries.ts'
 import { buildHamlet } from '../examples/hamlet.ts'
 
 function fresh() {
   const providers = stubProviders({
-    'salt-meat': { inputs: [{ good: 'meat', units: 1 }, { good: 'salt', units: 1 }], output: 'salt-meat', yield: 1, unitsPerFixtureDay: 10, labourPerUnit: 0.25 },
-    'smoked-meat': { inputs: [{ good: 'meat', units: 1 }], output: 'smoked-meat', yield: 1, unitsPerFixtureDay: 6, labourPerUnit: 0.25 },
+    'salt-meat': { inputs: [{ good: 'meat', units: 1 }, { good: 'salt', units: 1 }], output: 'salt-meat', yield: 1, unitsPerFixtureDay: 10, labourHoursPerUnit: 2.5 },
+    'smoked-meat': { inputs: [{ good: 'meat', units: 1 }], output: 'smoked-meat', yield: 1, unitsPerFixtureDay: 6, labourHoursPerUnit: 2.5 },
   })
   providers.labour.pools['pool.housing'] = 5
   const r = new Runner(initialState('stl.test', 'test'), defaultConfig(), providers)
@@ -20,7 +20,7 @@ function fresh() {
   r.run({ type: 'credit', holder: 'player', amount: 100 })
   r.run({ type: 'credit', holder: 'town', amount: 100 })
   providers.materials.set('butcher', 'timber', 50)
-  const proj = r.run<string>({ type: 'startProject', kind: 'construct', target: parcel, account: 'butcher', pool: 'pool.housing', wage: 1, labourDays: 1,
+  const proj = r.run<string>({ type: 'startProject', kind: 'construct', target: parcel, account: 'butcher', pool: 'pool.housing', wage: 1, labourHours: 10,
     materials: [{ material: 'timber', units: 10 }],
     plan: { footprint: { x: 1, y: 1, w: 8, h: 6 }, addFixtures: ['salting-house'],
       rooms: [{ id: 'shop', name: 'the shop', tiles: { x: 1, y: 1, w: 8, h: 6 }, use: 'work' }],
@@ -48,7 +48,7 @@ describe('U1 ids are stable and never reused', () => {
     a.r.run({ type: 'grantTitle', subject: big, holder: 'town' })
     const kids = a.r.run<string[]>({ type: 'splitParcel', parcel: big, children: [{ x: 20, y: 0, w: 10, h: 10 }, { x: 30, y: 0, w: 10, h: 10 }] })
     const grand = a.r.run<string[]>({ type: 'splitParcel', parcel: kids[0], children: [{ x: 20, y: 0, w: 5, h: 10 }, { x: 25, y: 0, w: 5, h: 10 }] })
-    const demolish = a.r.run<string>({ type: 'startProject', kind: 'demolish', target: a.bldg, account: 'butcher', labourDays: 0 })
+    const demolish = a.r.run<string>({ type: 'startProject', kind: 'demolish', target: a.bldg, account: 'butcher', labourHours: 0 })
     a.r.tick()
     expect(a.r.state.projects[demolish].status).toBe('done')
     expect(a.r.state.parcels[big].retired).toBe(true)
@@ -69,7 +69,7 @@ describe('U2 one holder per title, many tenants', () => {
     const ctx = fresh()
     const l1 = ctx.r.run<string>({ type: 'lease', title: ctx.title, tenant: 'a', scope: ['shop'], rent: 1 })
     expect(() => ctx.r.run({ type: 'lease', title: ctx.title, tenant: 'b', scope: ['shop'], rent: 1 })).toThrow(/already leased/)
-    ctx.r.run({ type: 'startProject', kind: 'renovate', target: ctx.bldg, account: 'butcher', labourDays: 0,
+    ctx.r.run({ type: 'startProject', kind: 'renovate', target: ctx.bldg, account: 'butcher', labourHours: 0,
       plan: { rooms: [{ id: 'back', name: 'back room', tiles: { x: 1, y: 5, w: 8, h: 2 }, use: 'store' }] } })
     ctx.r.tick()
     const l2 = ctx.r.run<string>({ type: 'lease', title: ctx.title, tenant: 'b', scope: ['back'], rent: 1 })
@@ -148,7 +148,7 @@ describe('U6 Q = min(equipment, labour, materials, utilities)', () => {
     const { biz, p1, p2 } = openShop(ctx)
     const extra = opts.fixtures - 1
     if (extra !== 0) {
-      ctx.r.run({ type: 'startProject', kind: 'renovate', target: ctx.bldg, account: 'butcher', labourDays: 0,
+      ctx.r.run({ type: 'startProject', kind: 'renovate', target: ctx.bldg, account: 'butcher', labourHours: 0,
         plan: extra > 0 ? { addFixtures: Array(extra).fill('salting-house') } : { removeFixtures: ['salting-house'] } })
       ctx.r.tick()
     }
@@ -214,7 +214,7 @@ describe('U8 layouts persist and projects write them', () => {
   it('renovate increments the version and keeps history; cancel leaves it; reload keeps it', () => {
     const ctx = fresh()
     ctx.providers.labour.pools['pool.builders'] = 1
-    const proj = ctx.r.run<string>({ type: 'startProject', kind: 'renovate', target: ctx.bldg, account: 'butcher', pool: 'pool.builders', wage: 1, labourDays: 2,
+    const proj = ctx.r.run<string>({ type: 'startProject', kind: 'renovate', target: ctx.bldg, account: 'butcher', pool: 'pool.builders', wage: 1, labourHours: 20,
       plan: { rooms: [{ id: 'back', name: 'back room', tiles: { x: 1, y: 5, w: 8, h: 2 }, use: 'smoke' }], addFixtures: ['smokehouse'],
         placements: [{ fixture: 'smokehouse', room: 'back', at: { x: 2, y: 6 } }] } })
     ctx.r.tick()
@@ -227,7 +227,7 @@ describe('U8 layouts persist and projects write them', () => {
     expect(bldg.fixtures).toEqual(['salting-house', 'smokehouse'])
     expect(bldg.layout.placements).toHaveLength(2)
     expect(bldg.layoutHistory[0].version).toBe(1)
-    const cancelled = ctx.r.run<string>({ type: 'startProject', kind: 'renovate', target: ctx.bldg, account: 'butcher', labourDays: 5, plan: { addFixtures: ['oven'] } })
+    const cancelled = ctx.r.run<string>({ type: 'startProject', kind: 'renovate', target: ctx.bldg, account: 'butcher', labourHours: 50, plan: { addFixtures: ['oven'] } })
     ctx.r.run({ type: 'cancelProject', project: cancelled })
     ctx.r.tick()
     expect(ctx.r.state.buildings[ctx.bldg].layout.version).toBe(2)
@@ -242,7 +242,7 @@ describe('U9 construction mints and demolition retires', () => {
     const ctx = fresh()
     expect(ctx.r.state.parcels[ctx.parcel].vacant).toBe(false)
     expect(ctx.r.state.buildings[ctx.bldg].builtOn).toBe(0)
-    const demolish = ctx.r.run<string>({ type: 'startProject', kind: 'demolish', target: ctx.bldg, account: 'butcher', labourDays: 0 })
+    const demolish = ctx.r.run<string>({ type: 'startProject', kind: 'demolish', target: ctx.bldg, account: 'butcher', labourHours: 0 })
     ctx.r.tick()
     expect(ctx.r.state.projects[demolish].status).toBe('done')
     expect(ctx.r.state.buildings[ctx.bldg].demolishedOn).toBe(1)
@@ -263,7 +263,7 @@ describe('U10 authority is data', () => {
     expect(() => ctx.r.run({ type: 'grantPermission', office: clerk, kind: 'build', subject: ctx.parcel })).toThrow(/lacks the power/)
     const site = ctx.r.run<string>({ type: 'addParcel', district: ctx.dist, footprint: { x: 20, y: 20, w: 10, h: 10 } })
     ctx.r.run({ type: 'grantTitle', subject: site, holder: 'town' })
-    const proj = ctx.r.run<string>({ type: 'startProject', kind: 'construct', target: site, account: 'town', pool: 'pool.housing', labourDays: 1, permitRequired: true,
+    const proj = ctx.r.run<string>({ type: 'startProject', kind: 'construct', target: site, account: 'town', pool: 'pool.housing', labourHours: 10, permitRequired: true,
       plan: { footprint: { x: 21, y: 21, w: 4, h: 4 } } })
     ctx.r.tick()
     expect(ctx.r.state.projects[proj].progress).toBe(0)
@@ -366,8 +366,8 @@ describe('U15 replay rebuilds the hamlet and A1 with the host providers', () => 
   it('replays commands and three ticks with identical state, events and command results', () => {
     function buildA1() {
       const providers = stubProviders({
-        'salt-meat': { inputs: [{ good: 'meat', units: 1 }, { good: 'salt', units: 1 }], output: 'salt-meat', yield: 1, unitsPerFixtureDay: 10, labourPerUnit: 0.25 },
-        'smoked-meat': { inputs: [{ good: 'meat', units: 1 }], output: 'smoked-meat', yield: 1, unitsPerFixtureDay: 6, labourPerUnit: 0.25 },
+        'salt-meat': { inputs: [{ good: 'meat', units: 1 }, { good: 'salt', units: 1 }], output: 'salt-meat', yield: 1, unitsPerFixtureDay: 10, labourHoursPerUnit: 2.5 },
+        'smoked-meat': { inputs: [{ good: 'meat', units: 1 }], output: 'smoked-meat', yield: 1, unitsPerFixtureDay: 6, labourHoursPerUnit: 2.5 },
       })
       providers.labour.pools['pool.housing'] = 5
       providers.prices.values['bldg.0001'] = 60
@@ -376,7 +376,7 @@ describe('U15 replay rebuilds the hamlet and A1 with the host providers', () => 
       const parcel = r.run<string>({ type: 'addParcel', district: dist, footprint: { x: 0, y: 0, w: 10, h: 10 }, access: ['road'] })
       r.run({ type: 'grantTitle', subject: parcel, holder: 'esfp-f' })
       providers.materials.set('esfp-f', 'timber', 20)
-      const build = r.run<string>({ type: 'startProject', kind: 'construct', target: parcel, account: 'esfp-f', labourDays: 0, materials: [{ material: 'timber', units: 10 }],
+      const build = r.run<string>({ type: 'startProject', kind: 'construct', target: parcel, account: 'esfp-f', labourHours: 0, materials: [{ material: 'timber', units: 10 }],
         plan: { footprint: { x: 1, y: 1, w: 8, h: 6 }, addFixtures: ['salting-house'],
           rooms: [{ id: 'shop', name: 'the shop', tiles: { x: 1, y: 1, w: 8, h: 4 }, use: 'work' }],
           placements: [{ fixture: 'salting-house', room: 'shop', at: { x: 2, y: 2 } }] } })
@@ -404,7 +404,7 @@ describe('U15 replay rebuilds the hamlet and A1 with the host providers', () => 
       r.tick()
       providers.labour.pools['pool.builders'] = 1
       providers.materials.set('esfp-f', 'timber', 10)
-      r.run({ type: 'startProject', kind: 'renovate', target: bldg, account: 'esfp-f', pool: 'pool.builders', wage: 1, labourDays: 2,
+      r.run({ type: 'startProject', kind: 'renovate', target: bldg, account: 'esfp-f', pool: 'pool.builders', wage: 1, labourHours: 20,
         materials: [{ material: 'timber', units: 5 }],
         plan: { rooms: [{ id: 'back', name: 'back room', tiles: { x: 1, y: 5, w: 8, h: 2 }, use: 'smoke' }],
           addFixtures: ['smokehouse'], placements: [{ fixture: 'smokehouse', room: 'back', at: { x: 2, y: 5 } }] } })
@@ -448,7 +448,7 @@ describe('U16 a project draws materials from its own inventory ref, not from its
     const before = r.state.ledger.length
     providers.materials.set('inv.yard', 'timber', 10)
     providers.materials.set('butcher', 'timber', 0)
-    const proj = r.run<string>({ type: 'startProject', kind: 'construct', target: parcel, account: 'butcher', inventory: 'inv.yard', pool: 'pool.housing', wage: 1, labourDays: 1,
+    const proj = r.run<string>({ type: 'startProject', kind: 'construct', target: parcel, account: 'butcher', inventory: 'inv.yard', pool: 'pool.housing', wage: 1, labourHours: 10,
       materials: [{ material: 'timber', units: 10 }], plan: { footprint: { x: 21, y: 1, w: 4, h: 4 }, rooms: [{ id: 'hut', name: 'hut', tiles: { x: 21, y: 1, w: 4, h: 4 }, use: 'living' }] } })
     expect(r.state.projects[proj].inventory).toBe('inv.yard')
     r.tick()
@@ -457,7 +457,7 @@ describe('U16 a project draws materials from its own inventory ref, not from its
     expect(providers.materials.get('butcher', 'timber')).toBe(0)
     const wage = r.state.ledger.slice(before).find((row) => row.subject === proj && row.kind === 'wage')!
     expect(wage.from).toBe('butcher')
-    const legacy = r.run<string>({ type: 'startProject', kind: 'repair', target: ctx.bldg, account: 'butcher', pool: 'pool.housing', labourDays: 1 })
+    const legacy = r.run<string>({ type: 'startProject', kind: 'repair', target: ctx.bldg, account: 'butcher', pool: 'pool.housing', labourHours: 10 })
     expect(r.state.projects[legacy].inventory).toBe('butcher')   // the default keeps old callers working; the record no longer conflates the two
   })
 })
@@ -488,5 +488,126 @@ describe('the hamlet example (reuse proof)', () => {
     expect(providers.materials.get('inv.sawyer', 'plank')).toBeGreaterThan(0)
     expect(totalMoney(r.state)).toBe(before)
     expect(assignmentsOf(r.state, 'alder').map((entry) => entry.kind)).toEqual(['residence'])
+  })
+})
+
+
+describe('U18 finite pool hours are shared across businesses and projects', () => {
+  it('grants at most the daily supply across roles and uses partial grants in caps', () => {
+    const ctx = fresh()
+    const { r, providers } = ctx
+    providers.labour.pools['pool.housing'] = 3.5
+    const businesses = [openShop(ctx), openShop(ctx)]
+    for (const { p1, p2 } of businesses) {
+      r.run({ type: 'hire', post: p1, holder: 'pool.housing' })
+      r.run({ type: 'hire', post: p2, holder: 'pool.housing' })
+    }
+    r.run({ type: 'removePost', post: businesses[1].p2 })
+    providers.materials.set('inv.shop', 'meat', 100)
+    providers.materials.set('inv.shop', 'salt', 100)
+    const project = r.run<string>({ type: 'startProject', kind: 'repair', target: ctx.bldg,
+      account: 'butcher', pool: 'pool.housing', labourHours: 10, wage: 1 })
+    const day = r.state.settlement.day
+    r.tick()
+    const caps = businesses.map(({ biz }) => r.state.production[biz].lines[0].caps.labour)
+    expect(caps).toEqual([8, 2])
+    const granted = providers.labour.grants.filter((row) => row.day === day).reduce((sum, row) => sum + row.hours, 0)
+    expect(granted).toBe(35)
+    expect(caps.reduce((sum, cap) => sum + cap * 2.5, 0) + r.state.projects[project].progress).toBe(granted)
+    expect(providers.labour.hours('pool.housing', 'other-role', day)).toBe(0)
+    expect(providers.labour.draw('pool.housing', 'other-role', null, 10, day)).toBe(0)
+    expect(providers.labour.hours('pool.housing', 'butcher', day + 1)).toBe(35)
+    expect(providers.labour.supply(day)).toEqual([{ category: 'pool.housing', persons: 3.5, personHours: 35 }])
+  })
+  it('uses the host day length, keeps the alias and caps named assignments across posts', () => {
+    const stub = new StubLabour(8)
+    expect(stub).toBeInstanceOf(StubLabourSupply)
+    stub.pools.crew = 2
+    expect(stub.draw('crew', 'sawyer', null, 12, 0)).toBe(12)
+    expect(stub.draw('crew', 'builder', null, 12, 0)).toBe(4)
+    expect(stub.draw('missing', 'builder', null, 12, 0)).toBe(0)
+    const ctx = fresh()
+    const { biz, p1, p2 } = openShop(ctx)
+    ctx.providers.labour.hours = () => 15
+    for (const post of [p1, p2]) ctx.r.run({ type: 'hire', post, holder: 'worker' })
+    ctx.r.tick()
+    expect(ctx.r.state.production[biz].lines[0].caps.labour).toBe(6)
+  })
+  it('rejects an undecided sharing rule with Q15', () => {
+    const { r } = fresh()
+    r.config.labourSharing = 'finite-hours'
+    expect(() => r.tick()).toThrow('open for Rex (Q15): labourSharing finite-hours')
+  })
+})
+
+describe('U19 person-hours preserve production, wages and project results', () => {
+  it('retains U7/U8/U13/U16 and A1 numbers, including in-order lines', () => {
+    const ctx = fresh()
+    const { r, providers } = ctx
+    const { biz, p1, p2 } = openShop(ctx)
+    r.run({ type: 'hire', post: p1, holder: 'butcher' })
+    r.run({ type: 'hire', post: p2, holder: 'pool.housing' })
+    providers.materials.set('inv.shop', 'meat', 100)
+    providers.materials.set('inv.shop', 'salt', 100)
+    providers.labour.pools['pool.builders'] = 1
+    const project = r.run<string>({ type: 'startProject', kind: 'renovate', target: ctx.bldg,
+      account: 'butcher', pool: 'pool.builders', labourHours: 20, wage: 1, plan: { addFixtures: ['smokehouse'] } })
+    r.tick()
+    expect(r.state.projects[project].status).toBe('active')
+    expect(r.state.production[biz].lines[0].q).toBe(8)
+    r.tick()
+    expect(r.state.projects[project].status).toBe('done')
+    expect(r.state.buildings[ctx.bldg].layout.version).toBe(2)
+    expect(ledger(r.state, { kind: 'wage', subject: project }).map((row) => row.amount)).toEqual([1, 1])
+    expect(ledger(r.state, { kind: 'wage', subject: p1 }).map((row) => row.amount)).toEqual([2, 2])
+    expect(ledger(r.state, { kind: 'wage', subject: p2 }).map((row) => row.amount)).toEqual([1, 1])
+    r.run({ type: 'setLines', biz, lines: [{ recipe: 'salt-meat', equipment: ['salting-house'] }, { recipe: 'smoked-meat', equipment: ['smokehouse'] }] })
+    r.tick()
+    expect(r.state.production[biz].lines.map((line) => line.q)).toEqual([8, 0])
+    providers.materials.recipes['salt-meat'].unitsPerFixtureDay = 3
+    r.tick()
+    expect(r.state.production[biz].lines[0].q).toBe(3)
+  })
+  it('converts explicit worker-day advances to hours and prorates fractional project draws', () => {
+    const { r, providers, bldg } = fresh()
+    const project = r.run<string>({ type: 'startProject', kind: 'repair', target: bldg,
+      account: 'butcher', pool: 'pool.builders', labourHours: 15, wage: 2 })
+    r.run({ type: 'advanceProject', project, workerDays: 1 })
+    expect(r.state.projects[project].progress).toBe(10)
+    providers.labour.pools['pool.builders'] = 1
+    r.tick()
+    expect(r.state.projects[project].progress).toBe(15)
+    expect(r.state.projects[project].status).toBe('done')
+    expect(ledger(r.state, { kind: 'wage', subject: project }).map((row) => row.amount)).toEqual([2, 1])
+  })
+  it('preserves the hamlet five-day output and wages', () => {
+    const { r, providers, ids } = buildHamlet()
+    r.tick(5)
+    expect(providers.materials.get('inv.sawyer', 'plank')).toBe(40)
+    expect(r.state.production[ids.biz].lines[0].q).toBe(2)
+    expect(balanceOf(r.state, ids.biz)).toBe(40)
+    expect(balanceOf(r.state, 'alder')).toBe(96)
+  })
+})
+
+describe('U20 setInventory rebinds a business inventory', () => {
+  it('the next tick uses the new ref and rejects missing businesses or empty refs atomically', () => {
+    const ctx = fresh()
+    const { r, providers } = ctx
+    const { biz, p1, p2 } = openShop(ctx)
+    for (const post of [p1, p2]) r.run({ type: 'hire', post, holder: 'pool.housing' })
+    for (const inventory of ['inv.shop', 'inv.new']) {
+      providers.materials.set(inventory, 'meat', 10)
+      providers.materials.set(inventory, 'salt', 10)
+    }
+    r.run({ type: 'setInventory', biz, inventory: 'inv.new' })
+    r.tick()
+    expect(r.state.businesses[biz].inventory).toBe('inv.new')
+    expect(providers.materials.get('inv.new', 'salt-meat')).toBe(8)
+    expect(providers.materials.get('inv.shop', 'meat')).toBe(10)
+    const before = structuredClone(r.state)
+    expect(() => r.run({ type: 'setInventory', biz, inventory: '' })).toThrow()
+    expect(() => r.run({ type: 'setInventory', biz: 'missing', inventory: 'inv.new' })).toThrow()
+    expect(r.state).toEqual(before)
   })
 })

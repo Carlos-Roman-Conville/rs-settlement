@@ -13,19 +13,19 @@ const BENCH = 'bench'
 // One shop on one parcel: `fixtures` benches, one required post of `hours` hours filled by a person, `materials`
 // units of the recipe's input on hand, a utility cap. Everything else is generous so one factor can be varied.
 function shop(opts: { fixtures: number; hours: number; materials: number; utility: number; recipe?: StubRecipe }) {
-  const recipe = opts.recipe ?? { inputs: [{ good: 'ore', units: 1 }], output: 'bar', yield: 1, unitsPerFixtureDay: 10, labourPerUnit: 0.25 }
+  const recipe = opts.recipe ?? { inputs: [{ good: 'ore', units: 1 }], output: 'bar', yield: 1, unitsPerFixtureDay: 10, labourHoursPerUnit: 2.5 }
   const providers = stubProviders({ bar: recipe })
   const r = new Runner(initialState('stl.val', 'validation'), defaultConfig(), providers)
   const dist = r.run<string>({ type: 'addDistrict', name: 'yard', kind: 'work', bounds: { x: 0, y: 0, w: 50, h: 50 } })
   const parcel = r.run<string>({ type: 'addParcel', district: dist, footprint: { x: 0, y: 0, w: 10, h: 10 }, access: ['road'] })
   r.run({ type: 'grantTitle', subject: parcel, holder: 'smith' })
-  r.run({ type: 'startProject', kind: 'construct', target: parcel, account: 'smith', labourDays: 0,
+  r.run({ type: 'startProject', kind: 'construct', target: parcel, account: 'smith', labourHours: 0,
     plan: { footprint: { x: 1, y: 1, w: 8, h: 6 }, rooms: [{ id: 'shop', name: 'the shop', tiles: { x: 1, y: 1, w: 8, h: 6 }, use: 'work' }] } })
   r.tick()
   const bldg = Object.keys(r.state.buildings)[0]
   r.run({ type: 'grantTitle', subject: bldg, holder: 'smith' })
   if (opts.fixtures > 0) {
-    r.run({ type: 'startProject', kind: 'renovate', target: bldg, account: 'smith', labourDays: 0, plan: { addFixtures: Array(opts.fixtures).fill(BENCH) } })
+    r.run({ type: 'startProject', kind: 'renovate', target: bldg, account: 'smith', labourHours: 0, plan: { addFixtures: Array(opts.fixtures).fill(BENCH) } })
     r.tick()
   }
   const biz = r.run<string>({ type: 'openBusiness', kind: 'smith', premises: [{ bldg, rooms: ['shop'] }], operator: 'smith', inventory: 'inv.shop',
@@ -93,7 +93,7 @@ describe('V3 production Q is monotone non-decreasing in every factor', () => {
 })
 
 describe('V4 an Infinity cap never yields an infinite or NaN output', () => {
-  const noInputs: StubRecipe = { inputs: [], output: 'water', yield: 1, unitsPerFixtureDay: 10, labourPerUnit: 0.25 }
+  const noInputs: StubRecipe = { inputs: [], output: 'water', yield: 1, unitsPerFixtureDay: 10, labourHoursPerUnit: 2.5 }
   const numbers = (ctx: ReturnType<typeof shop>) => {
     const entry = ctx.r.state.production[ctx.biz]
     return entry ? entry.lines.flatMap((line) => [line.q, ...Object.values(line.caps)]) : []
@@ -137,7 +137,7 @@ describe('V6 building condition stays in [0, 1] and only repair raises it', () =
   it('a completed repair project raises the condition', () => {
     const { r, bldg } = shop({ fixtures: 0, hours: 10, materials: 0, utility: 0 })
     r.run({ type: 'setCondition', bldg, condition: 0.3 })
-    const repair = r.run<string>({ type: 'startProject', kind: 'repair', target: bldg, account: 'smith', labourDays: 0 })
+    const repair = r.run<string>({ type: 'startProject', kind: 'repair', target: bldg, account: 'smith', labourHours: 0 })
     r.tick()
     expect(r.state.projects[repair].status).toBe('done')
     expect(r.state.buildings[bldg].condition).toBeGreaterThan(0.3)
@@ -152,7 +152,7 @@ describe('V7 a project draws exactly the materials it names, once', () => {
     providers.materials.set('smith', 'nails', 7)
     const parcel = r.run<string>({ type: 'addParcel', district: Object.keys(r.state.districts)[0], footprint: { x: 20, y: 0, w: 10, h: 10 }, access: ['road'] })
     r.run({ type: 'grantTitle', subject: parcel, holder: 'smith' })
-    const start = () => r.run<string>({ type: 'startProject', kind: 'construct', target: parcel, account: 'smith', labourDays: 5,
+    const start = () => r.run<string>({ type: 'startProject', kind: 'construct', target: parcel, account: 'smith', labourHours: 50,
       materials: [{ material: 'timber', units: 10 }],
       plan: { footprint: { x: 21, y: 1, w: 6, h: 5 }, rooms: [{ id: 'hall', name: 'hall', tiles: { x: 21, y: 1, w: 6, h: 5 }, use: 'living' }] } })
     return { r, providers, start }
@@ -246,7 +246,7 @@ describe('VAL-D1 years from new to ruined by material class', () => {
     r.tick()
     const loss = (1 - r.config.bands[0].min) / ((400 / 850) * 5 * 365 * 2)
     expect(r.state.buildings[bldg].condition).toBe(1 - loss)
-    const project = r.run<string>({ type: 'startProject', kind: 'repair', target: bldg, account: 'owner', labourDays: 10 })
+    const project = r.run<string>({ type: 'startProject', kind: 'repair', target: bldg, account: 'owner', labourHours: 100 })
     r.tick(3)
     expect(r.state.buildings[bldg].condition).toBe(1 - loss)
     r.run({ type: 'cancelProject', project })
@@ -296,6 +296,37 @@ describe('VAL-D1a unvalidated buildings do not decay', () => {
       r.run({ type: 'startProject', kind: 'demolish', target: bldg, account: 'owner' })
       r.tick()
       expect(unvalidatedDecay(r.state, r.config)).toEqual([])
+    }
+  })
+})
+
+
+describe('V5 assigned person-hours are conserved over 30 hamlet ticks', () => {
+  it('business caps and project progress account for every daily grant', () => {
+    const { r, providers, ids } = buildHamlet()
+    // Exercise both projects and multiple lines, with enough materials to use all assigned hours.
+    r.run({ type: 'setLines', biz: ids.biz, lines: [
+      { recipe: 'plank', equipment: ['saw-pit'] }, { recipe: 'plank', equipment: ['saw-pit'] },
+    ] })
+    providers.materials.recipes.plank.unitsPerFixtureDay = 1
+    providers.materials.set('inv.sawyer', 'log', 100)
+    const project = r.run<string>({ type: 'startProject', kind: 'repair', target: ids.houseId,
+      account: 'alder', pool: 'pool.hamlet', labourHours: 5, wage: 1 })
+    for (let tick = 0; tick < 30; tick++) {
+      const day = r.state.settlement.day
+      const before = r.state.projects[project].progress
+      const supply = providers.labour.supply(day).reduce((sum, row) => sum + row.personHours, 0)
+      r.tick()
+      const lines = r.state.production[ids.biz].lines
+      const assigned = lines[0].caps.labour * 5
+      const consumed = lines.reduce((sum, line) => sum + line.q * 5, 0)
+      const projectHours = r.state.projects[project].progress - before
+      const granted = providers.labour.grants.filter((row) => row.day === day).reduce((sum, row) => sum + row.hours, 0)
+      expect(assigned).toBeLessThanOrEqual(supply)
+      expect(granted).toBeLessThanOrEqual(supply)
+      expect(consumed).toBe(assigned)
+      expect(consumed + projectHours).toBe(granted)
+      expect(granted + providers.labour.hours('pool.hamlet', 'sawyer', day)).toBe(supply)
     }
   })
 })

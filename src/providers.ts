@@ -3,12 +3,20 @@
 
 import type { SettlementState } from './state.ts'
 
-export interface LabourProvider {
-  /** False while a person is aboard, dead or away: the host knows, the engine does not (Q2). */
+export interface LabourRow { category: string; persons: number; personHours: number }
+
+export interface LabourSupply {
+  /** The population's supply today by category (adult men, adult women, elders, children: Reality's
+   *  categories); persons = cohort × health × (1 − sick share), health applied once; personHours = persons ×
+   *  the host's hours per day (one number, Settlement's `hoursPerDay`, SET-12). */
+  supply(day: number): LabourRow[]
+  /** False while a person is aboard, dead or away: the host knows, the engines do not. */
   available(person: string, day: number): boolean
-  /** Workers an unnamed pool supplies for a role today, at most `wanted`. */
-  draw(pool: string, role: string, requires: unknown, wanted: number, day: number): number
-  /** 0..n output factor of a holder in a role; the host maps skill bands to this. */
+  /** Person-hours a person or a pool offers for a role today. */
+  hours(source: string, role: string, day: number): number
+  /** Person-hours a pool grants a post today: at most `wantedHours` and at most what it has not granted yet. */
+  draw(pool: string, role: string, requires: unknown, wantedHours: number, day: number): number
+  /** 0..n output factor of a holder in a role; the host maps skill bands to it. */
   productivity(holder: string, role: string): number
 }
 
@@ -27,7 +35,7 @@ export interface MaterialProvider {
 
 export interface Rates {
   unitsPerFixtureDay: number   // output units one fixture of each needed kind allows per day
-  labourPerUnit: number        // worker-days per unit; 0 means the line needs no labour
+  labourHoursPerUnit: number  // person-hours per unit; 0 means the line needs no labour
 }
 
 export interface UtilityProvider {
@@ -39,7 +47,7 @@ export interface PriceProvider {
 }
 
 export interface Providers {
-  labour: LabourProvider
+  labour: LabourSupply
   materials: MaterialProvider
   utilities: UtilityProvider
   prices: PriceProvider
@@ -74,7 +82,7 @@ export class StubMaterials implements MaterialProvider {
   rates(recipe: string): Rates {
     const def = this.recipes[recipe]
     if (!def) throw new Error(`stub recipe unknown: ${recipe}`)
-    return { unitsPerFixtureDay: def.unitsPerFixtureDay, labourPerUnit: def.labourPerUnit }
+    return { unitsPerFixtureDay: def.unitsPerFixtureDay, labourHoursPerUnit: def.labourHoursPerUnit }
   }
   have(inventory: string, material: string): number { return this.get(inventory, material) }
   take(inventory: string, material: string, units: number): number {
@@ -85,16 +93,37 @@ export class StubMaterials implements MaterialProvider {
   }
 }
 
-export class StubLabour implements LabourProvider {
+export class StubLabourSupply implements LabourSupply {
   away = new Set<string>()
-  pools: Record<string, number> = {}            // workers per pool per day
-  factors: Record<string, number> = {}          // productivity per holder (default 1)
+  pools: Record<string, number> = {} // workers per pool per day
+  factors: Record<string, number> = {}
+  grants: { day: number; pool: string; role: string; hours: number }[] = []
+  hoursPerDay: number
+  constructor(hoursPerDay = 10) { this.hoursPerDay = hoursPerDay }
+  supply(_day: number): LabourRow[] {
+    return Object.keys(this.pools).sort().map((pool) => ({
+      category: pool, persons: this.pools[pool], personHours: this.pools[pool] * this.hoursPerDay,
+    }))
+  }
   available(person: string): boolean { return !this.away.has(person) }
-  draw(pool: string, _role: string, _requires: unknown, wanted: number): number {
-    return Math.min(wanted, this.pools[pool] ?? 0)
+  hours(source: string, _role: string, day: number): number {
+    if (!this.available(source)) return 0
+    // Named people have no finite schedule in this stub; hosts can supply one through hours().
+    if (!Object.hasOwn(this.pools, source)) return source.startsWith('pool.') ? 0 : Infinity
+    const granted = this.grants.filter((row) => row.day === day && row.pool === source)
+      .reduce((sum, row) => sum + row.hours, 0)
+    return Math.max(0, this.pools[source] * this.hoursPerDay - granted)
+  }
+  draw(pool: string, role: string, _requires: unknown, wantedHours: number, day: number): number {
+    const hours = Object.hasOwn(this.pools, pool) ? Math.max(0, Math.min(wantedHours, this.hours(pool, role, day))) : 0
+    if (hours > 0) this.grants.push({ day, pool, role, hours })
+    return hours
   }
   productivity(holder: string): number { return this.factors[holder] ?? 1 }
 }
+
+/** @deprecated Use StubLabourSupply; retained for the economy adapter's fixtures. */
+export { StubLabourSupply as StubLabour }
 
 export class StubUtilities implements UtilityProvider {
   caps: Record<string, number> = {}
@@ -109,7 +138,7 @@ export class StubPrices implements PriceProvider {
 }
 
 export function stubProviders(recipes: Record<string, StubRecipe> = {}): Providers & {
-  labour: StubLabour; materials: StubMaterials; utilities: StubUtilities; prices: StubPrices
+  labour: StubLabourSupply; materials: StubMaterials; utilities: StubUtilities; prices: StubPrices
 } {
-  return { labour: new StubLabour(), materials: new StubMaterials(recipes), utilities: new StubUtilities(), prices: new StubPrices() }
+  return { labour: new StubLabourSupply(), materials: new StubMaterials(recipes), utilities: new StubUtilities(), prices: new StubPrices() }
 }

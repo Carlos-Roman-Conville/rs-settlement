@@ -48,6 +48,7 @@ export function reduce(state: SettlementState, command: Command, config: Settlem
     case 'closeBusiness': handlers.closeBusiness(ctx, command); break
     case 'setOperator': handlers.setOperator(ctx, command); break
     case 'setManager': handlers.setManager(ctx, command); break
+    case 'setInventory': handlers.setInventory(ctx, command); break
     case 'setLines': handlers.setLines(ctx, command); break
     case 'setPublicWorks': handlers.setPublicWorks(ctx, command); break
     case 'addPost': result = handlers.addPost(ctx, command); break
