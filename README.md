@@ -92,3 +92,5 @@ economy stay independent of the ghost and death question.
     examples/hamlet.ts  a hamlet with no game data: the reuse proof
     test/               one describe per TESTS.md U-row
     (later) scripts/derive_map.py   requirements -> dimensions, districts, first parcels (step 3, no typed counts)
+
+Decay now uses the interim material classes (R-2, VALIDATION section 4b); intentionally, unclassified buildings no longer decay and are listed by `unvalidatedDecay`.

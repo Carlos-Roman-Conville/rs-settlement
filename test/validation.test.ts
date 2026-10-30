@@ -3,9 +3,9 @@
 import { describe, expect, it } from 'vitest'
 import { Runner } from '../src/reduce.ts'
 import { initialState } from '../src/state.ts'
-import { defaultConfig } from '../src/config.ts'
+import { bandOf, defaultConfig } from '../src/config.ts'
 import { stubProviders, type StubRecipe } from '../src/providers.ts'
-import { totalMoney } from '../src/queries.ts'
+import { totalMoney, unvalidatedDecay } from '../src/queries.ts'
 import { buildHamlet } from '../examples/hamlet.ts'
 
 const BENCH = 'bench'
@@ -120,6 +120,7 @@ describe('V4 an Infinity cap never yields an infinite or NaN output', () => {
 describe('V6 building condition stays in [0, 1] and only repair raises it', () => {
   it('without repair, 1,000 ticks never rise, never leave [0, 1] and never go below 0', () => {
     const { r, bldg } = shop({ fixtures: 0, hours: 10, materials: 0, utility: 0 })
+    r.run({ type: 'setDecayClass', bldg, decayClass: 'palm-thatch' })
     let last = r.state.buildings[bldg].condition
     expect(last).toBeLessThanOrEqual(1)
     const start = last
@@ -187,20 +188,114 @@ describe('V7 a project draws exactly the materials it names, once', () => {
   })
 })
 
+// A building without businesses keeps lifetime sweeps independent of production and ledger growth.
+function decayBuilding(decayClass?: string, exposure?: string) {
+  const r = new Runner(initialState('stl.decay', 'decay'))
+  const district = r.run<string>({ type: 'addDistrict', name: 'test', kind: 'test', bounds: { x: 0, y: 0, w: 10, h: 10 } })
+  const parcel = r.run<string>({ type: 'addParcel', district, footprint: { x: 0, y: 0, w: 10, h: 10 } })
+  const bldg = r.run<string>({ type: 'addBuilding', parcel, footprint: { x: 0, y: 0, w: 5, h: 5 }, decayClass, exposure })
+  return { r, bldg, parcel }
+}
+
 describe('VAL-D1 years from new to ruined by material class', () => {
-  it.todo('VAL-D1 years from new to ruined by material class within sourced ranges (SET-20: the current bands ruin a building in about 850 days; model change under review)')
+  // Independent bounds transcribed from VALIDATION section 4b; 50 is the interim tile/slate estimate.
+  const ranges: Record<string, [number, number]> = {
+    'palm-thatch': [4, 10], 'reed-thatch': [15, 40], 'wood-shingle': [20, 30], 'tile-or-slate': [50, Infinity],
+  }
+  for (const [name, entry] of Object.entries(defaultConfig().decayClasses)) {
+    if (entry.yearsToRuin === null) continue
+    it(`VAL-D1 ${name} reaches ruin within 1% of its sourced lifetime`, () => {
+      const years = entry.yearsToRuin!
+      expect(years).toBeGreaterThanOrEqual(ranges[name][0])
+      expect(years).toBeLessThanOrEqual(ranges[name][1])
+      expect(entry.label).not.toBe('')
+      expect(entry.source).toMatch(/^https:\/\//)
+      const { r, bldg } = decayBuilding(name)
+      const expected = years * 365
+      let days = 0
+      while (bandOf(r.config, r.state.buildings[bldg].condition).name !== 'ruined' && days <= expected * 1.01) {
+        r.tick()
+        days++
+      }
+      expect(bandOf(r.config, r.state.buildings[bldg].condition).name).toBe('ruined')
+      expect(Math.abs(days - expected) / expected).toBeLessThanOrEqual(0.01)
+      expect(unvalidatedDecay(r.state, r.config)).toEqual([])
+    })
+  }
+
+  it('850 days restores the old daily rates, independently of deprecated decayPerDay', () => {
+    const { r, bldg } = decayBuilding('palm-thatch')
+    r.config.decayClasses['palm-thatch'].yearsToRuin = 850 / 365
+    const cases = [[1, 0.0005], [0.7, 0.001], [0.4, 0.002], [0.1, 0]]
+    for (const band of r.config.bands) band.decayPerDay = 99
+    for (const [condition, loss] of cases) {
+      r.run({ type: 'setCondition', bldg, condition })
+      r.tick()
+      expect(r.state.buildings[bldg].condition).toBe(condition - loss)
+    }
+    r.config.bands[0].min = 0.9
+    r.run({ type: 'setCondition', bldg, condition: 1 })
+    r.tick()
+    expect(r.state.buildings[bldg].condition).toBe(1 - (1 - 0.9) / 400)
+  })
+
+  it('host exposure scales time and an active repair suspends decay', () => {
+    const { r, bldg } = decayBuilding('palm-thatch')
+    r.config.exposure['test-factor'] = 2
+    r.run({ type: 'setDecayClass', bldg, decayClass: 'palm-thatch', exposure: 'test-factor' })
+    r.tick()
+    const loss = (1 - r.config.bands[0].min) / ((400 / 850) * 5 * 365 * 2)
+    expect(r.state.buildings[bldg].condition).toBe(1 - loss)
+    const project = r.run<string>({ type: 'startProject', kind: 'repair', target: bldg, account: 'owner', labourDays: 10 })
+    r.tick(3)
+    expect(r.state.buildings[bldg].condition).toBe(1 - loss)
+    r.run({ type: 'cancelProject', project })
+    r.tick()
+    expect(r.state.buildings[bldg].condition).toBe(1 - loss - loss)
+  })
+
+  it('construction preserves classes and commands reject unknown host classifications atomically', () => {
+    const { r, bldg, parcel } = decayBuilding('palm-thatch', 'salt-wind')
+    const before = structuredClone(r.state)
+    for (const decayClass of ['unknown', 'toString']) {
+      expect(() => r.run({ type: 'setDecayClass', bldg, decayClass })).toThrow('unknown decay class')
+      expect(() => r.run({ type: 'addBuilding', parcel, footprint: { x: 0, y: 0, w: 1, h: 1 }, decayClass })).toThrow('unknown decay class')
+      expect(() => r.run({ type: 'startProject', kind: 'construct', target: parcel, account: 'owner', plan: { decayClass } })).toThrow('unknown decay class')
+    }
+    expect(() => r.run({ type: 'setDecayClass', bldg, decayClass: 'palm-thatch', exposure: 'unknown' })).toThrow('unknown exposure')
+    expect(r.state).toEqual(before)
+    r.run({ type: 'setDecayClass', bldg, decayClass: 'wood-shingle' })
+    expect(r.state.buildings[bldg].exposure).toBe('salt-wind')
+    const project = r.run<string>({ type: 'startProject', kind: 'construct', target: parcel, account: 'owner',
+      plan: { footprint: { x: 5, y: 5, w: 2, h: 2 }, decayClass: 'reed-thatch', exposure: 'sheltered' } })
+    r.tick()
+    const built = r.state.projects[project].result!
+    expect(r.state.buildings[built]).toMatchObject({ decayClass: 'reed-thatch', exposure: 'sheltered', condition: 1 })
+    r.tick()
+    expect(r.state.buildings[built].condition).toBe(1 - (1 - 0.8) / ((400 / 850) * 25 * 365))
+  })
 })
 
-describe('VAL-D1a today\'s bands ruin a building in 850 days (the number SET-20 records)', () => {
-  it('days from condition 1 to the ruined band, summed from the configured bands', () => {
-    const bands = defaultConfig().bands
-    let upper = 1
-    let days = 0
-    for (const band of bands.slice(0, -1)) {
-      days += (upper - band.min) / band.decayPerDay
-      upper = band.min
+describe('VAL-D1a unvalidated buildings do not decay', () => {
+  it('no class preserves condition over 1,000 ticks and is listed', () => {
+    const { r, bldg } = decayBuilding()
+    r.tick(1000)
+    expect(r.state.buildings[bldg].condition).toBe(1)
+    expect(unvalidatedDecay(r.state, r.config)).toEqual([{ bldg, reason: 'no class' }])
+  })
+
+  it('null classes and null exposure are listed; demolished buildings are excluded', () => {
+    for (const [decayClass, exposure, reason] of [
+      ['masonry', 'sheltered', 'null class'], ['wattle-and-daub', 'sheltered', 'null class'],
+      ['palm-thatch', 'salt-wind', 'null exposure'],
+    ]) {
+      const { r, bldg } = decayBuilding(decayClass, exposure)
+      r.tick(1000)
+      expect(r.state.buildings[bldg].condition).toBe(1)
+      expect(unvalidatedDecay(r.state, r.config)).toEqual([{ bldg, reason }])
+      r.run({ type: 'startProject', kind: 'demolish', target: bldg, account: 'owner' })
+      r.tick()
+      expect(unvalidatedDecay(r.state, r.config)).toEqual([])
     }
-    expect(bands[bands.length - 1].outputFactor).toBe(0)
-    expect(Math.round(days)).toBe(850)
   })
 })

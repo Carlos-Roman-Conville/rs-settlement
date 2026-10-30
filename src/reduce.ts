@@ -42,6 +42,7 @@ export function reduce(state: SettlementState, command: Command, config: Settlem
     case 'setLayout': handlers.setLayout(ctx, command); break
     case 'addFixture': handlers.addFixture(ctx, command); break
     case 'removeFixture': handlers.removeFixture(ctx, command); break
+    case 'setDecayClass': handlers.setDecayClass(ctx, command); break
     case 'setCondition': handlers.setCondition(ctx, command); break
     case 'openBusiness': result = handlers.openBusiness(ctx, command); break
     case 'closeBusiness': handlers.closeBusiness(ctx, command); break

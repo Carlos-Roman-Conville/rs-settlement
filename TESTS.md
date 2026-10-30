@@ -120,7 +120,6 @@ Stability, conservation and boundary rows (V) and validation against evidence (V
 | V4 | a recipe with no inputs never yields an infinite or NaN Q; `production[biz]` holds finite numbers only |
 | V6 | condition stays in [0, 1], falls monotonically over 1,000 ticks without repair, never below 0; a completed repair raises it |
 | V7 | a project draws exactly the materials it names, once; a cancelled project draws nothing afterwards |
-| VAL-D1 | `it.todo`: years from new to ruined by material class within sourced ranges (SET-20; model change under review) |
-| VAL-D1a | the days from condition 1 to the ruined band, summed from `defaultConfig().bands`, are 850 |
+| VAL-D1, VAL-D1a | sourced material lifetimes reach ruin within 1%; unclassified buildings keep their condition for 1,000 ticks and are listed by `unvalidatedDecay`; null classes and exposures are flagged |
 
 V5 waits for P1. VAL-S1, VAL-C1, VAL-W1 and VAL-R1 wait for the starting data (Q10).

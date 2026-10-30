@@ -42,6 +42,8 @@ export interface Building {
   parcel: string
   footprint: Rect
   storeys: number
+  decayClass?: string
+  exposure?: string
   condition: number         // 0..1; bands are config data
   layout: Layout
   layoutHistory: Layout[]   // earlier versions, oldest first
@@ -142,6 +144,8 @@ export interface Assignment {
 }
 
 export interface ProjectPlan {
+  decayClass?: string
+  exposure?: string
   footprint?: Rect
   storeys?: number
   rooms?: Room[]            // rooms added (renovate) or the whole set (construct)

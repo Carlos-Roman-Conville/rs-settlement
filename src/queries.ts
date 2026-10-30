@@ -66,3 +66,13 @@ export function mapLayer(state: SettlementState): { districts: { id: string; kin
     parcels: Object.values(state.parcels).filter((entry) => !entry.retired).map((entry) => ({ id: entry.id, district: entry.district, footprint: entry.footprint, vacant: entry.vacant })),
   }
 }
+
+/** Standing buildings whose decay lacks evidence; repair and ruined condition are not evidence gaps. */
+export function unvalidatedDecay(state: SettlementState, config: SettlementConfig): { bldg: string; reason: 'no class' | 'null class' | 'null exposure' }[] {
+  return Object.values(state.buildings).filter((bldg) => bldg.demolishedOn === null).flatMap((bldg) => {
+    const reason = bldg.decayClass === undefined ? 'no class'
+      : config.decayClasses[bldg.decayClass]?.yearsToRuin == null ? 'null class'
+      : config.exposure[bldg.exposure ?? 'sheltered'] == null ? 'null exposure' : null
+    return reason === null ? [] : [{ bldg: bldg.id, reason }]
+  })
+}

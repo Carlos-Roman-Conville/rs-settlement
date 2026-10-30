@@ -24,13 +24,14 @@ export type Command =
   | { type: 'endLease'; lease: string }
   | { type: 'setRent'; lease: string; rent: number }
   // building
-  | { type: 'addBuilding'; parcel: string; footprint: Rect; storeys?: number; condition?: number; rooms?: Room[]; placements?: Placement[]; fixtures?: string[] }
+  | { type: 'addBuilding'; decayClass?: string; exposure?: string; parcel: string; footprint: Rect; storeys?: number; condition?: number; rooms?: Room[]; placements?: Placement[]; fixtures?: string[] }
   | { type: 'startProject'; kind: ProjectKind; target: string; plan?: ProjectPlan; materials?: { material: string; units: number }[]; labourDays?: number; pool?: string; wage?: number; account: string; inventory?: string; permitRequired?: boolean; permit?: string | null }
   | { type: 'advanceProject'; project: string; workerDays: number }
   | { type: 'cancelProject'; project: string }
   | { type: 'setLayout'; bldg: string; layout: Omit<Layout, 'version'>; by: string }
   | { type: 'addFixture'; bldg: string; fixture: string; by: string }
   | { type: 'removeFixture'; bldg: string; fixture: string; by: string }
+  | { type: 'setDecayClass'; bldg: string; decayClass: string; exposure?: string }
   | { type: 'setCondition'; bldg: string; condition: number }
   // business
   | { type: 'openBusiness'; kind: string; premises: { bldg: string; rooms?: string[] }[]; operator: string; manager?: string | null; inventory: string; lines?: ProductionLine[]; publicWorks?: boolean }
@@ -269,7 +270,21 @@ export function setRent(ctx: Ctx, c: Extract<Command, { type: 'setRent' }>): voi
 // building
 
 /** Seed a building that already stands (the town as it is when you arrive). New buildings come from projects. */
+function checkDecay(ctx: Ctx, data: { decayClass?: string; exposure?: string }): void {
+  if (data.decayClass !== undefined && !Object.hasOwn(ctx.config.decayClasses, data.decayClass)) throw new Error(`unknown decay class: ${data.decayClass}`)
+  if (data.exposure !== undefined && !Object.hasOwn(ctx.config.exposure, data.exposure)) throw new Error(`unknown exposure: ${data.exposure}`)
+}
+
+/** Host classification; omitting exposure preserves the building's current exposure. */
+export function setDecayClass(ctx: Ctx, c: Extract<Command, { type: 'setDecayClass' }>): void {
+  const bldg = building(ctx, c.bldg)
+  checkDecay(ctx, c)
+  bldg.decayClass = c.decayClass
+  if (c.exposure !== undefined) bldg.exposure = c.exposure
+}
+
 export function addBuilding(ctx: Ctx, c: Extract<Command, { type: 'addBuilding' }>): string {
+  checkDecay(ctx, c)
   const site = parcel(ctx, c.parcel)
   if (site.retired) throw new Error('parcel is retired')
   const footprint = rect(c.footprint, 'footprint')
@@ -282,6 +297,7 @@ export function addBuilding(ctx: Ctx, c: Extract<Command, { type: 'addBuilding' 
   if (condition > 1) throw new Error('condition is 0..1')
   const id = newId(ctx, 'bldg')
   ctx.state.buildings[id] = { id, parcel: site.id, footprint, storeys: c.storeys ?? 1, condition,
+    decayClass: c.decayClass, exposure: c.exposure,
     layout: { version: 1, rooms, placements }, layoutHistory: [], fixtures, builtOn: ctx.state.settlement.day, demolishedOn: null }
   site.buildings.push(id)
   site.vacant = false
@@ -295,6 +311,7 @@ export function startProject(ctx: Ctx, c: Extract<Command, { type: 'startProject
   if (!isParcel && !isBuilding) throw new Error(`unknown target: ${c.target}`)
   switch (c.kind) {
     case 'construct':
+      checkDecay(ctx, plan)
       if (!isParcel) throw new Error('construct targets a parcel')
       if (parcel(ctx, c.target).retired) throw new Error('parcel is retired')
       rect(plan.footprint ?? (() => { throw new Error('construct needs a footprint') })(), 'plan.footprint')
@@ -355,6 +372,7 @@ export function completeProject(ctx: Ctx, id: string): void {
       const rooms = plan.rooms ?? []
       checkPlacements(rooms, plan.placements ?? [], fixtures)
       ctx.state.buildings[bldgId] = { id: bldgId, parcel: site.id, footprint: plan.footprint!, storeys: plan.storeys ?? 1,
+        decayClass: plan.decayClass, exposure: plan.exposure,
         condition: plan.condition ?? 1, layout: { version: 1, rooms: structuredClone(rooms), placements: structuredClone(plan.placements ?? []) },
         layoutHistory: [], fixtures, builtOn: day, demolishedOn: null }
       site.buildings.push(bldgId)
