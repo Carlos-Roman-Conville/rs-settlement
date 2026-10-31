@@ -80,7 +80,7 @@ subject, amount, authority, note }`.)
 | `MaterialProvider.available(inventory, recipe)` | output units the inputs on hand allow, by Economy's recipe quantities; `Infinity` for a recipe with no inputs | pure; the same answer twice in a day. (settlement: the tick floors it; a fractional answer is allowed) |
 | `MaterialProvider.produce(inventory, recipe, units)` | consumes inputs (an `inputsAny` choice: the host's rule, default the first available: **(proposed)**), adds outputs and by-products, records the day's production on the inventory's market | throws if `units > available` (settlement: guaranteed never asked; `units` is a non-negative integer, at most `floor(available)`, and never 0: the tick skips a line with `q = 0`) |
 | `MaterialProvider.have(inventory, material)` / `take(inventory, material, units)` | stock reads and draws for projects | `take` returns what was taken, at most `units`, at most the stock; the project step takes a project's materials all or nothing, checking `have` for each first |
-| `MaterialProvider.rates(recipe)` → `{ unitsPerFixtureDay, labourPerUnit }` | the recipe's rates | (settlement: **accepted**; read twice per line per tick; must be finite and non-negative; `labourPerUnit = 0` means the line needs no labour) |
+| `MaterialProvider.rates(recipe)` → `{ unitsPerFixtureDay, labourPerUnit }` | the recipe's rates | (settlement: **accepted**; read once per line per tick; must be finite and non-negative; `labourPerUnit = 0` means the line needs no labour) |
 | `PriceProvider.valueOf(subject, day)` | **goods and inventories only**: a good's current market price, an inventory's value at market | **(open, Rex)** who values a title, building or parcel for a sale the host does not price: Economy can offer a materials-plus-labour replacement cost; a land market is not proposed. (settlement: today no engine code calls `valueOf`; `sell` takes an explicit `price`. The provider stays declared for the open item; the engine will call it only once Rex answers, and then only for a `sell` without a price) |
 
 Economy does **not** implement `LabourProvider` (available, draw, productivity: persons, skill bands and pools are
@@ -88,10 +88,6 @@ the host's and realism's POPULATION work; Economy offers only a band-to-factor t
 `UtilityProvider` (realism). (settlement: agreed. For the record, Settlement's `LabourProvider` today is
 `available(person, day)`, `draw(pool, role, requires, wanted, day) → number`, `productivity(holder, role)`;
 `UtilityProvider` is `capacity(building, recipe, state)`. Neither is part of this contract.)
-
-Production calls `labour.productivity`, `materials.rates`, `materials.available`, and `utilities.capacity` twice
-per tick, in the Q20 prepass and the production pass. These query methods must be pure: no state change, and
-the same answer for the same arguments within a tick.
 
 ### 4b. What Settlement gives Economy (`SettlementReader`, read-only, pure over `SettlementState`)
 
