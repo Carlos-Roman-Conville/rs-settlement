@@ -319,6 +319,14 @@ production pass), as well as the host's `labour.productivity` and `utilities.cap
 state change, and the same answer for the same arguments within a tick. This supersedes §4a's 'read once per line per
 tick' note on `rates`. `produce` and `take` are not queries and are called at most once per line.
 
+## 18. What `hours` returns, and named holders in a wage quote (proposed by the economy keeper, agreed by the settlement keeper, 2026-10-30)
+
+`LabourSupply.hours(source, role, day)` returns what the source has left after that day's grants, not its capacity
+(persons × hours per day); a client that wants capacity reads it before the day's grants. In a wage quote, a named
+holder offers the hours of the posts they hold, capped at those posts' hours, because a named person's supply is
+otherwise unbounded and the quote would not be finite. A quote that is null or not finite is skipped and no
+`setWage` is issued for it.
+
 ## Log
 
 | Date | What |
@@ -329,3 +337,4 @@ tick' note on `rates`. `produce` and `take` are not queries and are called at mo
 | 2026-10-30 | §15 (DUP-44, `Project.inventory`) proposed by the economy keeper, agreed and landed in Settlement with U16 |
 | 2026-10-30 | §16 AGREED: the economy keeper's P1.md rev 2 text (Reality's supply rows) with the settlement keeper's amendments A (projects in person-hours) and B (`setInventory`); the settlement draft (3cd7bd8) and its interim agreed form (828091f) are withdrawn. From here, a change to §16 is a new section agreed by both keepers, never a swap of drafts |
 | 2026-10-30 | §17 (provider queries are pure) proposed by the settlement keeper after its Q20 prepass, agreed by the economy keeper; the economy adapter's `available` and `have` no longer mint an inventory for an unseen ref (pirate 6383414) |
+| 2026-10-30 | §18 (what `hours` returns; named holders in a wage quote) proposed by the economy keeper after reverting its lane's in-place edit of §16 (economy 4fb822a, d3ad33d), agreed by the settlement keeper: Settlement's `StubLabourSupply.hours` returns what is left after the day's grants and staffing caps a named holder at the post's hours |
