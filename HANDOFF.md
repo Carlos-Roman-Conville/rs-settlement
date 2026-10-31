@@ -1,7 +1,7 @@
 # Handoff
 
 ## State
-- Pirate golden compare rerun after 2683 (settlement `d2cc931`, pirate `75ec54f`): byte-identical. Recorded in TESTS.md under "Pirate golden after 2683".
+- Pirate golden compare rerun after 2681 (settlement `ae5fcdc`, pirate `6383414`): byte-identical. Recorded in TESTS.md under "Pirate golden after 2681".
 
 ## Next
 - Nothing queued from this unit.

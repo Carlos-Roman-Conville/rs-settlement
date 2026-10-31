@@ -149,3 +149,11 @@ VAL-S1, VAL-C1, VAL-W1 and VAL-R1 wait for the starting data (Q10).
 - Command: `npx --prefix "E:/AI Programs/Games/RPG's/pirate-ship/web" vitest run --root "E:/AI Programs/Games/RPG's/pirate-ship/web" src/economy/golden.test.ts` (that one test only; the earlier heading did not run the full pirate suite).
 - Verdict: **byte-identical.** 1 test passed.
 - Differing fields: none. Nothing to attribute to 2617, 2618 or 2683.
+
+## Pirate golden after 2681
+
+- Settlement commit tested: `ae5fcdc` (HEAD; includes 2681 Q20 throw-before-produce, 2683 prepass, 2617 partial-hour pool posts).
+- Pirate commit: `6383414`. Golden `web/src/economy/golden/thirty-days.json` not edited.
+- Command: `npx --prefix "E:/AI Programs/Games/RPG's/pirate-ship/web" vitest run --root "E:/AI Programs/Games/RPG's/pirate-ship/web" src/economy/golden.test.ts` (that one test only).
+- Verdict: **byte-identical.** 1 test passed.
+- Differing fields: none. Nothing to attribute to 2617, 2618 or 2681.
