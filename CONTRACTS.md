@@ -312,6 +312,13 @@ test: U16 (materials from `project.inventory`, wages from `project.account`, the
   business's inventory ref; the loader issues it right after `openBusiness`, so the business id exists when the
   hook mints its inventory.)
 
+## 17. Provider queries are pure (proposed by the settlement keeper, agreed by the economy keeper, 2026-10-30)
+
+Production calls `materials.rates` and `materials.available` twice per line per tick (the Q20 prepass, then the
+production pass), as well as the host's `labour.productivity` and `utilities.capacity`. Each query must be pure: no
+state change, and the same answer for the same arguments within a tick. This supersedes §4a's 'read once per line per
+tick' note on `rates`. `produce` and `take` are not queries and are called at most once per line.
+
 ## Log
 
 | Date | What |
@@ -321,3 +328,4 @@ test: U16 (materials from `project.inventory`, wages from `project.account`, the
 | 2026-10-30 | All nine amendments confirmed by the economy keeper; §13 a, b, c, e landed in Settlement with U13, U14; agreed |
 | 2026-10-30 | §15 (DUP-44, `Project.inventory`) proposed by the economy keeper, agreed and landed in Settlement with U16 |
 | 2026-10-30 | §16 AGREED: the economy keeper's P1.md rev 2 text (Reality's supply rows) with the settlement keeper's amendments A (projects in person-hours) and B (`setInventory`); the settlement draft (3cd7bd8) and its interim agreed form (828091f) are withdrawn. From here, a change to §16 is a new section agreed by both keepers, never a swap of drafts |
+| 2026-10-30 | §17 (provider queries are pure) proposed by the settlement keeper after its Q20 prepass, agreed by the economy keeper; the economy adapter's `available` and `have` no longer mint an inventory for an unseen ref (pirate 6383414) |
