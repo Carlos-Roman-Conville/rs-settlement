@@ -5,10 +5,12 @@
 - Office powers route through an optional authority provider (e52afbd, U22). Land subjects are passed to the authority checks (6e350e3, U23). Contract: GOVERNMENT-SETTLEMENT.md, agreed by both keepers (ac0a81d).
 - Hire completion reports its intention cause and outcome (7e49d3c, U24). The engine emits the event `postFilled`.
 - CONTRACTS.md has sections 17 (provider queries are pure), 18 (what hours returns; named wage holders) and 19 (a person's reservation wage, IF-27), each copied byte-identically from the economy keeper.
-- Pirate golden compare: last recorded byte-identical after 2681 (settlement `ae5fcdc`, pirate `6383414`), in TESTS.md "Pirate golden after 2681". It has not been rerun since the authority and hire changes (src and kernel.json changed after that).
+- Kernel: settlement depends on `@rex/kernel` at tag v0.1.0, fetched from the backup mirror (690b1f7, unit 5064), not a folder link.
+- U25: `pay()` moves money through the kernel `transfer()` via `moneyLedger` in `src/money-ledger.ts` (4a9d127). Credit/debit and zero-amount deeds are not transfers. Whether a payer may go into debt is open (Rex's Q19).
+- Golden drift: TESTS.md has no `Golden drift` section yet, so unit 5092's outcome is not recorded here; read it there once it lands. Last recorded pirate golden: byte-identical after 2681 (`ae5fcdc`/`6383414`). Every task touching `src/` or `examples/` runs the settlement goldens in its Gate.
 
 ## Next
-- Nothing queued; the next unit needs a keeper-agreed interface (IF-number) or a DEPENDENCIES.md/CHAINS.md entry.
+- A shared `transfer()` batch pairing the money ledger with economy's goods ledger, after economy 5068 lands. It needs a design pass first, not a build.
 
 ## Blocked
 - Pirate task 2618 sat in pirate-ship's failed/ with an `economy.test.ts` type error (last noted in TESTS.md); not rechecked here, not touched.
