@@ -5,7 +5,7 @@ import { finite, must, nonempty } from '@rex/kernel'
 import type { SettlementConfig } from './config.ts'
 import type { SettlementEvent } from './events.ts'
 import { mint, type Prefix } from './ids.ts'
-import type { Providers } from './providers.ts'
+import { officePowersAuthority, type Providers } from './providers.ts'
 import { titleOver as queryTitleOver } from './queries.ts'
 import type { Account, Building, Business, Lease, Parcel, Post, Project, SettlementState, Title, TransactionKind } from './state.ts'
 
@@ -75,10 +75,12 @@ export function hasRightOfUse(ctx: Ctx, who: string, bldg: string): boolean {
   return Object.values(ctx.state.leases).some((entry) => entry.title === owner.id && entry.tenant === who && entry.status === 'active')
 }
 
-export function officeHas(ctx: Ctx, office: string | null | undefined, power: string): string {
+export function officeHas(ctx: Ctx, office: string | null | undefined, power: string, subject: string | null = null): string {
   if (!office) throw new Error(`an office with the power '${power}' is required`)
   const found = must(ctx.state.offices, office, 'office')
   if (!found.holder) throw new Error(`office is vacant: ${office}`)
-  if (!found.powers.includes(power)) throw new Error(`office ${office} lacks the power '${power}'`)
+  if (!(ctx.providers.authority ?? officePowersAuthority(ctx.state)).may(office, power, subject, ctx.state.settlement.day)) {
+    throw new Error(`office ${office} lacks the power '${power}'`)
+  }
   return office
 }

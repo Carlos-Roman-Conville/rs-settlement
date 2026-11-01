@@ -152,6 +152,13 @@
       "kind": "quantity",
       "unit": "count/d",
       "direction": "in"
+    },
+    {
+      "mechanism": "settlement.authority.office_powers",
+      "quantity": "government.office_may",
+      "kind": "quantity",
+      "unit": "1",
+      "direction": "in"
     }
   ],
   "streams": []

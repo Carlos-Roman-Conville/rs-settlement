@@ -46,11 +46,22 @@ export interface PriceProvider {
   valueOf(subject: string, day: number): number
 }
 
+export interface AuthorityProvider {
+  /** Pure (CONTRACTS §17): may this office exercise this power over this subject on this day?
+   *  GOVERNMENT-SETTLEMENT.md §2. */
+  may(office: string, power: string, subject: string | null, day: number): boolean
+}
+
+export function officePowersAuthority(state: SettlementState): AuthorityProvider {
+  return { may: (office, power) => state.offices[office]?.powers.includes(power) ?? false }
+}
+
 export interface Providers {
   labour: LabourSupply
   materials: MaterialProvider
   utilities: UtilityProvider
   prices: PriceProvider
+  authority?: AuthorityProvider
 }
 
 // In-memory stubs for tests and examples.

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import ts from 'typescript'
 import { Runner } from '../src/reduce.ts'
 import { initialState } from '../src/state.ts'
@@ -6,6 +6,7 @@ import { defaultConfig } from '../src/config.ts'
 import { stubProviders, StubLabour, StubLabourSupply } from '../src/providers.ts'
 import { assignmentsOf, balanceOf, hasFixture, holderOf, ledger, physical, tenantsOf, totalMoney } from '../src/queries.ts'
 import { buildHamlet } from '../examples/hamlet.ts'
+import { officeHas, type Ctx } from '../src/context.ts'
 
 function fresh() {
   const providers = stubProviders({
@@ -276,6 +277,66 @@ describe('U10 authority is data', () => {
     expect(ledger(ctx.r.state, { kind: 'permit' })).toHaveLength(1)
     ctx.r.run({ type: 'vacate', office: mayor })
     expect(ledger(ctx.r.state, { kind: 'vacate' })).toHaveLength(1)
+  })
+})
+
+describe('U22 office powers go through the AuthorityProvider (GOVERNMENT-SETTLEMENT §2, §7)', () => {
+  it('defaults to powers for a permit grant and a missing-power refusal', () => {
+    const { r, providers, parcel } = fresh()
+    expect(providers.authority).toBeUndefined()
+    const mayor = r.run<string>({ type: 'createOffice', name: 'mayor', powers: ['permit'] })
+    const clerk = r.run<string>({ type: 'createOffice', name: 'clerk', powers: [] })
+    r.run({ type: 'appoint', office: mayor, holder: 'estj-f' })
+    r.run({ type: 'appoint', office: clerk, holder: 'clerk-1' })
+    expect(() => r.run({ type: 'grantPermission', office: clerk, kind: 'build', subject: parcel }))
+      .toThrow(`office ${clerk} lacks the power 'permit'`)
+    const permit = r.run<string>({ type: 'grantPermission', office: mayor, kind: 'build', subject: parcel })
+    expect(r.state.permissions[permit].grantedBy).toBe(mayor)
+    expect(ledger(r.state, { kind: 'permit' })).toHaveLength(1)
+  })
+
+  it('a provider refusal overrides permit powers without adding a permission or ledger row', () => {
+    const { r, providers, parcel } = fresh()
+    const mayor = r.run<string>({ type: 'createOffice', name: 'mayor', powers: ['permit'] })
+    r.run({ type: 'appoint', office: mayor, holder: 'estj-f' })
+    providers.authority = { may: () => false }
+    const before = structuredClone(r.state)
+    expect(() => r.run({ type: 'grantPermission', office: mayor, kind: 'build', subject: parcel }))
+      .toThrow(`office ${mayor} lacks the power 'permit'`)
+    expect(r.state.permissions).toEqual(before.permissions)
+    expect(r.state.ledger).toEqual(before.ledger)
+  })
+
+  it('a provider approval permits an office without the permit power', () => {
+    const { r, providers, parcel } = fresh()
+    const clerk = r.run<string>({ type: 'createOffice', name: 'clerk', powers: [] })
+    r.run({ type: 'appoint', office: clerk, holder: 'clerk-1' })
+    providers.authority = { may: () => true }
+    const permit = r.run<string>({ type: 'grantPermission', office: clerk, kind: 'build', subject: parcel })
+    expect(r.state.permissions[permit].grantedBy).toBe(clerk)
+  })
+
+  it('asks once with the office, power, null subject and current day', () => {
+    const { r, providers, parcel } = fresh()
+    const mayor = r.run<string>({ type: 'createOffice', name: 'mayor', powers: ['permit'] })
+    r.run({ type: 'appoint', office: mayor, holder: 'estj-f' })
+    const may = vi.fn(() => true)
+    providers.authority = { may }
+    r.run({ type: 'grantPermission', office: mayor, kind: 'build', subject: parcel })
+    expect(may).toHaveBeenCalledExactlyOnceWith(mayor, 'permit', null, r.state.settlement.day)
+  })
+
+  it('rejects vacant, null and unknown offices before asking the provider', () => {
+    const { r, providers, parcel } = fresh()
+    const mayor = r.run<string>({ type: 'createOffice', name: 'mayor', powers: ['permit'] })
+    const may = vi.fn(() => true)
+    providers.authority = { may }
+    expect(() => r.run({ type: 'grantPermission', office: mayor, kind: 'build', subject: parcel }))
+      .toThrow(`office is vacant: ${mayor}`)
+    const ctx: Ctx = { state: r.state, config: r.config, providers, events: [], staffed: new Set() }
+    expect(() => officeHas(ctx, null, 'permit')).toThrow("an office with the power 'permit' is required")
+    expect(() => officeHas(ctx, 'missing', 'permit')).toThrow(/office/)
+    expect(may).not.toHaveBeenCalled()
   })
 })
 
