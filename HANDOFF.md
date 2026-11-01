@@ -10,10 +10,9 @@
 - Golden drift: the two settlement goldens were re-recorded for `postFilled` (kernel d62287a, unit 5092); see TESTS.md `Golden drift` (8687fa4). Last pirate golden compare: byte-identical after 2681; the pirate-ship settlement and economy tests run in the Gate of 5093 (d57d0a3). Every task touching `src/` or `examples/` runs the settlement goldens in its Gate.
 
 ## Next
-- A shared `transfer()` batch pairing the money ledger with economy's goods ledger, after economy 5068 lands. It needs a design pass first, not a build.
+- Pay-for-goods batch: design in TRANSFER-BATCH-DESIGN.md (recommends a goods leg on `pay`, Option B). Next: send its questions to the economy keeper, then agree a new CONTRACTS section before any build. Q19 stays open.
 
 ## Blocked
-- Pirate task 2618 sat in pirate-ship's failed/ with an `economy.test.ts` type error (last noted in TESTS.md); not rechecked here, not touched.
 - The host must map the engine event name `postFilled` to registry row `settlement.post_filled`; the outcome registry producer is `shared.action.resolution`, not settlement.
 
 ## Gotchas
