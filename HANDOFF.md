@@ -9,8 +9,10 @@
 - U25: `pay()` moves money through the kernel `transfer()` via `moneyLedger` in `src/money-ledger.ts` (4a9d127). Credit/debit and zero-amount deeds are not transfers. Whether a payer may go into debt is open (Rex's Q19).
 - Pay-for-goods: CONTRACTS section 20 agreed with the economy keeper (f5c7d0a = economy db06ee3) and built in 898243b (U26): `pay` takes a goods leg through `Runner.run(cmd, {goods})`; money and goods move in one kernel `transfer()`; no balance check (Q19 open).
 - Golden drift: the two settlement goldens were re-recorded for `postFilled` (kernel d62287a, unit 5092); see TESTS.md `Golden drift` (8687fa4). Last pirate golden compare: byte-identical after 2681; the pirate-ship settlement and economy tests run in the Gate of 5093 (d57d0a3). Every task touching `src/` or `examples/` runs the settlement goldens in its Gate.
+- Multi-currency and N-leg pay (section 22) built in ae9d06f (U27) and corrected by section 23 in 8d0c454 (U28): every currency leg is quantity = currency id, unit = `money`.
 
 ## Next
+- Economy exchange unit can now call `pay` with `legs.money` in several currencies.
 - Section 20 other half (economy lane): economy `trade` builds the goods TransferLedger and calls settlement `pay` with `goods` data plus `{goods: ledger}` opts; the pirate host LedgerProvider seam passes `goods.ledger` as opts.
 
 ## Blocked
