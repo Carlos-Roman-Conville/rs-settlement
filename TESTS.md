@@ -21,6 +21,7 @@ alignment command the `AlignmentState` JSON is byte-identical to a run without t
 
 | Id | Rule under test | Must hold |
 |---|---|---|
+| U25 | kernel money transfers (`test/money-ledger.test.ts`) | wages and pay conserve money; rows, events and replay stay byte-identical; zero/self payments do not move balances; holders and money units are validated; debt remains allowed (Q19 open); failed batches restore accounts atomically |
 | U1 | ids are stable and never reused | split a parcel twice, demolish a building, replay the log: the same ids come out; the retired parent id is still queryable and marked retired |
 | U2 | one holder per title, many tenants | a `lease` on a leased title adds a second lease; a second `sell` of the same title is refused unless the first buyer is the seller |
 | U3 | ownership is not control | after `sell(title of the shop building)`, `operator(biz)` and `manager(biz)` are unchanged; after `setOperator`, the title holder is unchanged |

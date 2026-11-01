@@ -1,10 +1,11 @@
 // The working context of one reduce call: a deep copy of the state (so a throw leaves the caller's state
 // untouched), the config, the providers and the events collected so far. Helpers every command and tick step share.
 
-import { finite, must, nonempty } from '@rex/kernel'
+import { finite, must, nonempty, transfer, TransferJournal } from '@rex/kernel'
 import type { SettlementConfig } from './config.ts'
 import type { SettlementEvent } from './events.ts'
 import { mint, type Prefix } from './ids.ts'
+import { moneyLedger } from './money-ledger.ts'
 import { officePowersAuthority, type Providers } from './providers.ts'
 import { titleOver as queryTitleOver } from './queries.ts'
 import type { Account, Building, Business, Lease, Parcel, Post, Project, SettlementState, Title, TransactionKind } from './state.ts'
@@ -55,10 +56,17 @@ export function record(ctx: Ctx, kind: TransactionKind, from: string | null, to:
 export function pay(ctx: Ctx, from: string, to: string, amount: number, kind: TransactionKind, subject: string | null,
   authority: string | null = null, note = ''): string {
   finite(amount, 'amount', 0)
-  const payer = accountOf(ctx, from)
-  const payee = accountOf(ctx, to)
-  payer.balance -= amount
-  payee.balance += amount
+  accountOf(ctx, from)
+  accountOf(ctx, to)
+  // Zero amounts and self-payments leave balances unchanged; the kernel refuses both.
+  if (amount > 0 && from !== to) {
+    const ledger = moneyLedger(ctx)
+    transfer(new TransferJournal('settlement.money'), {
+      t: ctx.state.settlement.day * 86_400_000, process: 'settlement.ledger.pay',
+      quantity: 'money', unit: 'money', amount,
+      from: { ledger, account: from }, to: { ledger, account: to }, note: kind,
+    })
+  }
   return record(ctx, kind, from, to, subject, amount, authority, note)
 }
 
