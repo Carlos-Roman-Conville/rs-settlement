@@ -58,7 +58,8 @@ export type Command =
   // money
   | { type: 'credit'; holder: string; amount: number; note?: string }
   | { type: 'debit'; holder: string; amount: number; note?: string }
-  | { type: 'pay'; from: string; to: string; amount: number; kind: string; subject?: string | null; note?: string }
+  | { type: 'pay'; from: string; to: string; amount: number; kind: string; subject?: string | null; note?: string;
+      goods?: { from: string; to: string; good: string; units: number } }
   // time
   | { type: 'tick' }
 
@@ -660,7 +661,15 @@ export function debit(ctx: Ctx, c: Extract<Command, { type: 'debit' }>): void {
 
 /** Move money between holders under the caller's kind (CONTRACTS.md s3, s13e): the economy's LedgerProvider.transfer. Returns the row id. */
 export function payCommand(ctx: Ctx, c: Extract<Command, { type: 'pay' }>): string {
-  return pay(ctx, nonempty(c.from, 'from'), nonempty(c.to, 'to'), finite(c.amount, 'amount', 0), nonempty(c.kind, 'kind'), c.subject ?? null, null, c.note ?? '')
+  if (ctx.opts?.goods && !c.goods) throw new Error('pay: a goods ledger was passed without goods data')
+  if (c.goods) {
+    nonempty(c.goods.from, 'goods.from')
+    nonempty(c.goods.to, 'goods.to')
+    nonempty(c.goods.good, 'goods.good')
+    finite(c.goods.units, 'units', 0)
+  }
+  const goods = c.goods && ctx.opts?.goods ? { ledger: ctx.opts.goods, ...c.goods } : undefined
+  return pay(ctx, nonempty(c.from, 'from'), nonempty(c.to, 'to'), finite(c.amount, 'amount', 0), nonempty(c.kind, 'kind'), c.subject ?? null, null, c.note ?? '', goods)
 }
 
 export function setInventory(ctx: Ctx, c: Extract<Command, { type: 'setInventory' }>): void {

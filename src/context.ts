@@ -2,18 +2,21 @@
 // untouched), the config, the providers and the events collected so far. Helpers every command and tick step share.
 
 import { finite, must, nonempty, transfer, TransferJournal } from '@rex/kernel'
+import type { TransferLedger, TransferRequest } from '@rex/kernel'
 import type { SettlementConfig } from './config.ts'
 import type { SettlementEvent } from './events.ts'
 import { mint, type Prefix } from './ids.ts'
 import { moneyLedger } from './money-ledger.ts'
 import { officePowersAuthority, type Providers } from './providers.ts'
 import { titleOver as queryTitleOver } from './queries.ts'
+import type { ReduceOpts } from './reduce.ts'
 import type { Account, Building, Business, Lease, Parcel, Post, Project, SettlementState, Title, TransactionKind } from './state.ts'
 
 export interface Ctx {
   state: SettlementState
   config: SettlementConfig
   providers: Providers
+  opts?: ReduceOpts
   events: SettlementEvent[]
   /** The day's staffing outcome (business ids); tick context only, never saved in the state. */
   staffed: Set<string>
@@ -54,19 +57,31 @@ export function record(ctx: Ctx, kind: TransactionKind, from: string | null, to:
 
 /** Move money between holders and write the ledger row. Balances may go negative (debt); the total is conserved. */
 export function pay(ctx: Ctx, from: string, to: string, amount: number, kind: TransactionKind, subject: string | null,
-  authority: string | null = null, note = ''): string {
+  authority: string | null = null, note = '',
+  goods?: { ledger: TransferLedger; from: string; to: string; good: string; units: number }): string {
   finite(amount, 'amount', 0)
   accountOf(ctx, from)
   accountOf(ctx, to)
+  const requests: TransferRequest[] = []
+  const t = ctx.state.settlement.day * 86_400_000
   // Zero amounts and self-payments leave balances unchanged; the kernel refuses both.
   if (amount > 0 && from !== to) {
     const ledger = moneyLedger(ctx)
-    transfer(new TransferJournal('settlement.money'), {
-      t: ctx.state.settlement.day * 86_400_000, process: 'settlement.ledger.pay',
+    requests.push({
+      t, process: 'settlement.ledger.pay',
       quantity: 'money', unit: 'money', amount,
       from: { ledger, account: from }, to: { ledger, account: to }, note: kind,
     })
   }
+  if (goods && finite(goods.units, 'units', 0) > 0) {
+    requests.push({
+      t, process: 'economy.trade.trade', quantity: goods.good,
+      unit: goods.ledger.unit(goods.from, goods.good), amount: goods.units,
+      from: { ledger: goods.ledger, account: goods.from },
+      to: { ledger: goods.ledger, account: goods.to }, note: kind,
+    })
+  }
+  if (requests.length) transfer(new TransferJournal('settlement.money'), ...requests)
   return record(ctx, kind, from, to, subject, amount, authority, note)
 }
 

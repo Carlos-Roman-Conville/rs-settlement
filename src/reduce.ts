@@ -3,7 +3,7 @@
 // mutable stores (inventories): a throw after a provider call is the host's to roll back, which is why every
 // command validates before it calls a provider.
 
-import { Runner as KernelRunner, type Reducer } from '@rex/kernel'
+import { Runner as KernelRunner, type Reducer, type TransferLedger } from '@rex/kernel'
 import * as handlers from './commands.ts'
 import type { Command } from './commands.ts'
 import { defaultConfig, type SettlementConfig } from './config.ts'
@@ -14,11 +14,12 @@ import { initialState, type SettlementState } from './state.ts'
 import { tick } from './tick/index.ts'
 
 export interface ReduceResult { state: SettlementState; events: SettlementEvent[]; result: unknown }
+export interface ReduceOpts { goods?: TransferLedger }
 
 export function reduce(state: SettlementState, command: Command, config: SettlementConfig = defaultConfig(),
-  providers: Providers = stubProviders()): ReduceResult {
+  providers: Providers = stubProviders(), opts?: ReduceOpts): ReduceResult {
   if (!command || typeof command !== 'object' || typeof (command as { type?: unknown }).type !== 'string') throw new Error('invalid command')
-  const ctx: Ctx = { state: structuredClone(state), config, providers, events: [], staffed: new Set() }
+  const ctx: Ctx = { state: structuredClone(state), config, providers, opts, events: [], staffed: new Set() }
   let result: unknown = undefined
   switch (command.type) {
     case 'addDistrict': result = handlers.addDistrict(ctx, command); break
@@ -80,13 +81,19 @@ const RunnerBase: new (state: SettlementState, reduce: Reducer<SettlementState, 
 export class Runner extends RunnerBase {
   config: SettlementConfig
   providers: Providers
+  private opts?: ReduceOpts
   constructor(state: SettlementState, config: SettlementConfig = defaultConfig(), providers: Providers = stubProviders()) {
-    super(state, (state, command) => reduce(state, command, this.config, this.providers))
+    super(state, (state, command) => reduce(state, command, this.config, this.providers, this.opts))
     this.config = config
     this.providers = providers
   }
-  run<T = unknown>(command: Command): T {
-    return super.run(command).result as T
+  run<T = unknown>(command: Command, opts?: ReduceOpts): T {
+    this.opts = opts
+    try {
+      return super.run(command).result as T
+    } finally {
+      this.opts = undefined
+    }
   }
   tick(days = 1): void { for (let i = 0; i < days; i++) this.run({ type: 'tick' }) }
   /** Supply the starting state (including its identity) and providers rebuilt at that same log boundary. */
