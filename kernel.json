@@ -134,16 +134,16 @@
     },
     {
       "mechanism": "settlement.project.construction",
-      "quantity": "economy.stock_taken",
+      "quantity": "economy.units_taken",
       "kind": "quantity",
       "unit": "count",
       "direction": "in"
     },
     {
       "mechanism": "settlement.project.construction",
-      "quantity": "economy.stock_taken",
-      "kind": "quantity",
-      "unit": "count",
+      "quantity": "economy.stock_changes",
+      "kind": "record",
+      "unit": null,
       "direction": "call"
     },
     {
