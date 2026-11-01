@@ -103,8 +103,8 @@ describe('U27 currencies and N-leg payments satisfy §22 T1–T6', () => {
     const ids = r.run<string[]>(exchange(), { goods: goods.ledger })
     expect(transfer).toHaveBeenCalledTimes(1)
     expect(transfer.mock.calls[0].slice(1)).toMatchObject([
-      { t: 0, quantity: 'pieces', unit: 'pieces', process: 'settlement.ledger.pay', note: 'exchange' },
-      { t: 0, quantity: 'shells', unit: 'shells', process: 'settlement.ledger.pay', note: 'exchange' },
+      { t: 0, quantity: 'pieces', unit: 'money', process: 'settlement.ledger.pay', note: 'exchange' },
+      { t: 0, quantity: 'shells', unit: 'money', process: 'settlement.ledger.pay', note: 'exchange' },
       { t: 0, quantity: 'fish', unit: 'count', process: 'economy.trade.trade', note: 'exchange' },
     ])
     expect(ids).toEqual(r.state.ledger.map(row => row.id))
@@ -118,6 +118,28 @@ describe('U27 currencies and N-leg payments satisfy §22 T1–T6', () => {
     expect(balanceOf(r.state, 'seller', 'shells')).toBe(-2)
     expect(goods.stock()).toEqual({ stall: { fish: 7 }, bag: { fish: 3 } })
     expect(r.events).toEqual([])
+  })
+
+  it('T1 pieces and shells legs in one call move only their own currency balances', () => {
+    const r = fresh()
+    for (const holder of ['a', 'b']) {
+      for (const currency of ['money', 'pieces', 'shells']) {
+        r.run({ type: 'credit', holder, currency, amount: 10, process: 'test.issue' })
+      }
+    }
+    r.run({ type: 'pay', kind: 'exchange', legs: { money: [
+      { from: 'a', to: 'b', currency: 'pieces', amount: 7 },
+      { from: 'b', to: 'a', currency: 'shells', amount: 2 },
+    ] } })
+    expect(balanceOf(r.state, 'a', 'pieces')).toBe(3)
+    expect(balanceOf(r.state, 'b', 'pieces')).toBe(17)
+    expect(balanceOf(r.state, 'a', 'shells')).toBe(12)
+    expect(balanceOf(r.state, 'b', 'shells')).toBe(8)
+    expect(balanceOf(r.state, 'a')).toBe(10)
+    expect(balanceOf(r.state, 'b')).toBe(10)
+    for (const currency of ['money', 'pieces', 'shells']) {
+      expect(totalOf(r.state, currency)).toBe(20)
+    }
   })
 
   it('barter moves goods in order without rows or money accounts', () => {
@@ -350,7 +372,7 @@ describe('U27 currencies and N-leg payments satisfy §22 T1–T6', () => {
     accountOf(ctx, 'a')
     const ledger = moneyLedger(ctx)
     const before = ledger.snapshot()
-    expect(ledger.unit('a', 'pieces')).toBe('pieces')
+    expect(ledger.unit('a', 'pieces')).toBe('money')
     expect(ledger.snapshot()).toEqual(before)
     expect(() => ledger.unit('missing', 'pieces')).toThrow('unknown money holder: missing')
     ledger.apply('a', 'pieces', -3)

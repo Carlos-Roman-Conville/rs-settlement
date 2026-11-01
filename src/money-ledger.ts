@@ -15,7 +15,7 @@ export function moneyLedger(ctx: Ctx): TransferLedger {
     id: 'settlement.money',
     unit(holder, quantity) {
       account(holder, quantity)
-      return quantity
+      return 'money'
     },
     apply(holder, quantity, delta) {
       const entry = account(holder, quantity)

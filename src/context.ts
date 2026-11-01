@@ -77,7 +77,7 @@ export function pay(ctx: Ctx, from: string, to: string, amount: number, kind: Tr
     const ledger = moneyLedger(ctx)
     requests.push({
       t, process: 'settlement.ledger.pay',
-      quantity: currency, unit: currency, amount,
+      quantity: currency, unit: 'money', amount,
       from: { ledger, account: from }, to: { ledger, account: to }, note: kind,
     })
   }
@@ -120,7 +120,7 @@ export function payLegs(ctx: Ctx, legs: PaymentLegs, kind: TransactionKind, subj
   const ledger = moneyLedger(ctx)
   for (const leg of legs.money) {
     if (leg.amount === 0 || leg.from === leg.to) continue
-    requests.push({ t, process: 'settlement.ledger.pay', quantity: leg.currency, unit: leg.currency,
+    requests.push({ t, process: 'settlement.ledger.pay', quantity: leg.currency, unit: 'money',
       amount: leg.amount, from: { ledger, account: leg.from }, to: { ledger, account: leg.to }, note: kind })
   }
   if (goodsLedger) for (const leg of legs.goods ?? []) {
