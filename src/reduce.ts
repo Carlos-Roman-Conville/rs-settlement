@@ -7,7 +7,7 @@ import { Runner as KernelRunner, type Reducer, type TransferLedger } from '@rex/
 import * as handlers from './commands.ts'
 import type { Command } from './commands.ts'
 import { defaultConfig, type SettlementConfig } from './config.ts'
-import type { Ctx } from './context.ts'
+import { currencyOf, type Ctx } from './context.ts'
 import type { SettlementEvent } from './events.ts'
 import { stubProviders, type Providers } from './providers.ts'
 import { initialState, type SettlementState } from './state.ts'
@@ -67,7 +67,16 @@ export function reduce(state: SettlementState, command: Command, config: Settlem
     case 'debit': handlers.debit(ctx, command); break
     case 'pay': result = handlers.payCommand(ctx, command); break
     case 'setWage': handlers.setWage(ctx, command); break
-    case 'tick': tick(ctx); break
+    case 'tick':
+      // Reject invalid wage/rent currencies before projects, staffing or production mutate host providers.
+      for (const post of Object.values(ctx.state.posts)) {
+        if (post.wage > 0 && ctx.state.businesses[post.biz]) currencyOf(ctx, post.currency)
+      }
+      for (const lease of Object.values(ctx.state.leases)) {
+        if (lease.status === 'active' && lease.rent > 0) currencyOf(ctx, lease.currency)
+      }
+      tick(ctx)
+      break
     default: throw new Error(`unknown settlement command: ${String((command as { type: string }).type)}`)
   }
   return { state: ctx.state, events: ctx.events, result }

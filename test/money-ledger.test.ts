@@ -72,7 +72,7 @@ describe('U25 kernel transfers conserve settlement money and preserve payment re
     expect(ledger.unit('town', 'money')).toBe('money')
     expect(() => ledger.unit('missing', 'money')).toThrow('unknown money holder')
     expect(() => ledger.unit('acct.0001', 'money')).toThrow('unknown money holder')
-    expect(() => ledger.unit('town', 'goods')).toThrow('unknown money quantity')
+    expect(() => ledger.unit('town', 'goods')).toThrow('unknown currency: goods')
     expect(ctx.state).toEqual(before)
   })
 

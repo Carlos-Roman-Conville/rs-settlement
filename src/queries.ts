@@ -54,11 +54,15 @@ export const ledger = (state: SettlementState, filter: LedgerFilter = {}): Trans
     && (fromDay === undefined || row.day >= fromDay) && (toDay === undefined || row.day <= toDay))
 }
 
-export const balanceOf = (state: SettlementState, holder: string): number =>
-  Object.values(state.accounts).find((account) => account.holder === holder)?.balance ?? 0
+export const balanceOf = (state: SettlementState, holder: string, currency = 'money'): number => {
+  const account = Object.values(state.accounts).find((account) => account.holder === holder)
+  return (currency === 'money' ? account?.balance : account?.balances?.[currency]) ?? 0
+}
 
-export const totalMoney = (state: SettlementState): number =>
-  Object.values(state.accounts).reduce((sum, account) => sum + account.balance, 0)
+export const totalOf = (state: SettlementState, currency: string): number =>
+  Object.values(state.accounts).reduce((sum, account) => sum + (currency === 'money' ? account.balance : account.balances?.[currency] ?? 0), 0)
+
+export const totalMoney = (state: SettlementState): number => totalOf(state, 'money')
 
 export function mapLayer(state: SettlementState): { districts: { id: string; kind: string; bounds: Rect }[]; parcels: { id: string; district: string; footprint: Rect; vacant: boolean }[] } {
   return {

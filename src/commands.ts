@@ -1,7 +1,8 @@
 // The command union and its handlers. Every handler validates its own invariants and throws on a breach;
 // the reducer copied the state first, so a throw changes nothing.
 
-import { accountOf, building, business, finite, hasRightOfUse, lease, must, newId, nonempty, officeHas, parcel, pay, post, project, record, title, titleOver, type Ctx } from './context.ts'
+import { accountOf, building, business, currencyOf, finite, hasRightOfUse, lease, must, newId, nonempty, officeHas, parcel, pay, payLegs, post, project, record, title, titleOver, type Ctx, type PaymentLegs } from './context.ts'
+import { moneyLedger } from './money-ledger.ts'
 import { isPool } from './ids.ts'
 import { contains, overlaps, union, type AssignmentKind, type Layout, type Placement, type ProductionLine, type ProjectKind, type ProjectPlan, type Rect, type Room, type Transferable } from './state.ts'
 import { bandOf } from './config.ts'
@@ -56,10 +57,12 @@ export type Command =
   | { type: 'grantPermission'; office: string; kind: string; subject: string; expires?: number | null }
   | { type: 'revokePermission'; permission: string; office: string }
   // money
-  | { type: 'credit'; holder: string; amount: number; note?: string }
-  | { type: 'debit'; holder: string; amount: number; note?: string }
+  | { type: 'credit'; holder: string; amount: number; note?: string; currency?: string; process?: string }
+  | { type: 'debit'; holder: string; amount: number; note?: string; currency?: string; process?: string }
   | { type: 'pay'; from: string; to: string; amount: number; kind: string; subject?: string | null; note?: string;
-      goods?: { from: string; to: string; good: string; units: number } }
+      currency?: string; legs?: never; goods?: { from: string; to: string; good: string; units: number } }
+  | { type: 'pay'; legs: PaymentLegs; kind: string; subject?: string | null; note?: string;
+      from?: never; to?: never; amount?: never; currency?: never; goods?: never }
   // time
   | { type: 'tick' }
 
@@ -650,17 +653,29 @@ export function revokePermission(ctx: Ctx, c: Extract<Command, { type: 'revokePe
 // money
 
 export function credit(ctx: Ctx, c: Extract<Command, { type: 'credit' }>): void {
-  accountOf(ctx, nonempty(c.holder, 'holder')).balance += finite(c.amount, 'amount', 0)
-  record(ctx, 'credit', null, c.holder, null, c.amount, null, c.note ?? '')
+  const currency = currencyOf(ctx, c.currency)
+  if (currency !== 'money' && !c.process) throw new Error('credit: a process is required')
+  accountOf(ctx, nonempty(c.holder, 'holder'))
+  moneyLedger(ctx).apply(c.holder, currency, finite(c.amount, 'amount', 0))
+  record(ctx, 'credit', null, c.holder, null, c.amount, null, c.note ?? '', currency, c.process)
 }
 
 export function debit(ctx: Ctx, c: Extract<Command, { type: 'debit' }>): void {
-  accountOf(ctx, nonempty(c.holder, 'holder')).balance -= finite(c.amount, 'amount', 0)
-  record(ctx, 'debit', c.holder, null, null, c.amount, null, c.note ?? '')
+  const currency = currencyOf(ctx, c.currency)
+  if (currency !== 'money' && !c.process) throw new Error('debit: a process is required')
+  accountOf(ctx, nonempty(c.holder, 'holder'))
+  moneyLedger(ctx).apply(c.holder, currency, -finite(c.amount, 'amount', 0))
+  record(ctx, 'debit', c.holder, null, null, c.amount, null, c.note ?? '', currency, c.process)
 }
 
 /** Move money between holders under the caller's kind (CONTRACTS.md s3, s13e): the economy's LedgerProvider.transfer. Returns the row id. */
-export function payCommand(ctx: Ctx, c: Extract<Command, { type: 'pay' }>): string {
+export function payCommand(ctx: Ctx, c: Extract<Command, { type: 'pay' }>): string | string[] {
+  if (c.legs !== undefined) {
+    if (['from', 'to', 'amount', 'currency', 'goods'].some(key => Object.hasOwn(c, key))) {
+      throw new Error('pay: legs cannot be combined with single-payment fields')
+    }
+    return payLegs(ctx, c.legs, c.kind, c.subject ?? null, c.note ?? '', ctx.opts?.goods)
+  }
   if (ctx.opts?.goods && !c.goods) throw new Error('pay: a goods ledger was passed without goods data')
   if (c.goods) {
     nonempty(c.goods.from, 'goods.from')
@@ -669,7 +684,7 @@ export function payCommand(ctx: Ctx, c: Extract<Command, { type: 'pay' }>): stri
     finite(c.goods.units, 'units', 0)
   }
   const goods = c.goods && ctx.opts?.goods ? { ledger: ctx.opts.goods, ...c.goods } : undefined
-  return pay(ctx, nonempty(c.from, 'from'), nonempty(c.to, 'to'), finite(c.amount, 'amount', 0), nonempty(c.kind, 'kind'), c.subject ?? null, null, c.note ?? '', goods)
+  return pay(ctx, nonempty(c.from, 'from'), nonempty(c.to, 'to'), finite(c.amount, 'amount', 0), nonempty(c.kind, 'kind'), c.subject ?? null, null, c.note ?? '', goods, c.currency)
 }
 
 export function setInventory(ctx: Ctx, c: Extract<Command, { type: 'setInventory' }>): void {

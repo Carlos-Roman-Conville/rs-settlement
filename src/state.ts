@@ -70,6 +70,7 @@ export interface Lease {
   tenant: string            // opaque
   scope: 'whole' | string[] // whole, or room ids
   rent: number              // per day
+  currency?: string
   start: number
   end: number | null
   terms: unknown
@@ -94,9 +95,12 @@ export interface Transaction {
   amount: number
   authority: string | null  // an office id
   note: string
+  currency?: string
+  batch?: string
+  process?: string
 }
 
-export interface Account { id: string; holder: string; balance: number }
+export interface Account { id: string; holder: string; balance: number; balances?: Record<string, number> }
 
 export interface ProductionLine {
   recipe: string            // opaque; its rates come from MaterialProvider.rates each tick (CONTRACTS.md s13a)
@@ -126,6 +130,7 @@ export interface Post {
   role: string              // opaque occupation id
   requires: unknown         // evaluated by the LabourSupply
   wage: number              // per day
+  currency?: string
   hours: number             // per day
   required: boolean         // the business is dormant while a required post is unfilled
   holder: string | null     // a person id or a pool id

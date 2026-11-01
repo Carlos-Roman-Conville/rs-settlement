@@ -8,13 +8,13 @@ export function wages(ctx: Ctx): void {
     const biz = ctx.state.businesses[post.biz]
     if (!biz) continue
     const payer = biz.publicWorks ? ctx.state.accounts[ctx.state.settlement.treasury].holder : biz.id
-    pay(ctx, payer, post.filledBy, post.wage, 'wage', post.id)
+    pay(ctx, payer, post.filledBy, post.wage, 'wage', post.id, null, '', undefined, post.currency)
     ctx.events.push({ type: 'wagePaid', post: post.id, to: post.filledBy, amount: post.wage })
   }
   for (const lease of Object.values(ctx.state.leases)) {
     if (lease.status !== 'active' || lease.rent <= 0) continue
     const landlord = ctx.state.titles[lease.title].holder
-    pay(ctx, lease.tenant, landlord, lease.rent, 'rent', lease.id)
+    pay(ctx, lease.tenant, landlord, lease.rent, 'rent', lease.id, null, '', undefined, lease.currency)
     ctx.events.push({ type: 'rentPaid', lease: lease.id, to: landlord, amount: lease.rent })
   }
 }
