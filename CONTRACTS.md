@@ -381,6 +381,16 @@ trade with the market's own stall (one inventory on both sides) passes no `goods
 (shipments, production, consumption, spoilage, take, takeMass, addMass, addStock) never go through `pay`; freight
 stays its own `freight` row. No leg refuses on balance: Q19 and ECON-26 stay open for Rex.
 
+## 21. Named holders' hours are netted by the client (REG-32; proposed by the settlement keeper, agreed by the economy keeper, 2026-11-01)
+
+§18's "what the source has left after that day's grants" holds for pool sources, whose grants go through `draw`. A
+named person is never drawn: `LabourSupply.hours(person, role, day)` returns that person's hours for the day, unchanged
+by any grant, and the client that grants named hours nets them itself. Settlement's staffing step keeps one running
+total per person for the tick, across all roles and posts, and grants each post at most
+`min(post.hours, hours(person, role, day) − already granted that tick)`. A provider must not subtract named grants
+itself, or they are subtracted twice. Offers, refusals and their expiry are the provider's own policy and are outside
+this contract.
+
 ## Log
 
 | Date | What |
@@ -394,3 +404,4 @@ stays its own `freight` row. No leg refuses on balance: Q19 and ECON-26 stay ope
 | 2026-10-30 | §18 (what `hours` returns; named holders in a wage quote) proposed by the economy keeper after reverting its lane's in-place edit of §16 (economy 4fb822a, d3ad33d), agreed by the settlement keeper: Settlement's `StubLabourSupply.hours` returns what is left after the day's grants and staffing caps a named holder at the post's hours |
 | 2026-11-01 | §19 (a person's reservation wage, IF-27) proposed by the economy keeper, agreed by the settlement keeper: an optional pure query read only by the economy's wage quote; no staffing rule (the decision is the person's, Cognition) |
 | 2026-11-01 | §20 (money and goods in one transfer) proposed by the economy keeper, agreed by the settlement keeper with five amendments (settlement's `reduce`/`Runner.run` seam, no event, batch order and time, each leg skipped on its own zero): Settlement's `pay` takes an optional goods leg as data and the live ledger in `opts`; Settlement-only replay moves the money leg alone, exactly |
+| 2026-11-01 | §21 (named holders' hours are netted by the client, REG-32) proposed by the settlement keeper, agreed by the economy keeper: §18's "left after grants" is for pools; Settlement staffing nets named grants across roles per tick (`namedUsed`), and a provider must not subtract them; no code changes in either engine |
