@@ -47,7 +47,7 @@ the engine stores and compares the string and never interprets it.
 | `Post` | `id`, `biz`, `role` (opaque: an occupation id), `requires` (opaque skill requirement the labour provider evaluates), `wage` {amount, per: day}, `holder` (a person id, a pool id, or null), `hours[]` | staffing scales with the facility: posts are added by the host, never a fixed count per kind |
 | `Assignment` | `id`, `person` (opaque), `kind` (**residence / employment / management / membership**), `target` (bldg, post, biz, or an opaque crew id), `since`, `until` | **non-exclusive (Rex)**: a person may hold any number, of any kinds, at once |
 | `Project` | `id`, `kind` (construct / renovate / repair / demolish / split / merge / public-work), `target` (parcel or bldg), `plan` (a `Layout` delta, a footprint, or a fixture list), `needs` {materials[], labourDays, permit}, `progress`, `permit` (txn id or null), `status` | construction and renovation; `advance` consumes materials and labour through the providers |
-| `Office` | `id`, `settlement`, `name` (opaque: mayor, council, harbour-master ...), `holder` (opaque or null), `powers[]` (opaque: permit, public-title, tax, seize ...), `seat` (bldg id) | authority. **The mayor is an office seated in the town hall building (Rex, via paste)**; how an office is won is the host's (the `sec.townhall` contest stays the story's) |
+| `Office` | `id`, `settlement`, `name` (opaque: mayor, council, harbour-master ...), `holder` (opaque or null), `powers[]` (opaque: permit, public-title, tax, seize ...), `seat` (bldg id) | authority. **The mayor is an office seated in the town hall building (Rex, via paste)**; how an office is won is the host's (the `sec.townhall` contest stays the story's). **Powers are Government's (DUP-62, government/DESIGN.md §2.3):** `powers[]` is setup data read locally until Government exists; then `officeHas` asks `AuthorityProvider.may(office, power, subject, day)`, whose default reads `powers[]`. Settlement keeps the record (holder, seat) and the vacancy check. |
 | `Permission` | `id`, `kind`, `subject`, `grantedBy` (office), `txn`, `expires` | municipal permissions, as ledger-backed records |
 
 Physical and economic development are **separate readings**, never one flag: `physical(bldg) = condition band`,
@@ -63,11 +63,11 @@ JSON state, failed commands throw without changing state. One daily `tick` comma
 | Group | Commands |
 |---|---|
 | land | `addDistrict`, `growDistrict`, `addParcel`, `splitParcel`, `mergeParcels`, `zone` |
-| property | `grantTitle` (from `none` or `town`, by an office), `sell` (title, buyer, price, authority?), `transfer` (no price; gift, inheritance, seizure, with `kind`), **`inherit(title, heir)`** (the heir is named by the host; the engine has no law of succession), `lease`, `endLease`, `setRent` |
+| property | `grantTitle` (from `none` or `town`, by an office), `sell` (title, buyer, price, authority?), `transfer` (no price; gift, inheritance, seizure, with `kind`), **`inherit(title, heir)`** (the heir is named by the caller: the host today, Government once built (DUP-62); the engine has no law of succession, and which inheritance law applies to a world is Rex's), `lease`, `endLease`, `setRent` |
 | building | `startProject`, `advanceProject(days or amount)`, `cancelProject`, `setLayout` (only through a completed renovate project, or freely when `config.freeLayout` is on for the player's own buildings: Rex's call), `addFixture`, `removeFixture`, `setCondition` (decay and repair come through tick and projects; this is the host's override) |
 | business | `openBusiness`, `closeBusiness`, `setOperator`, `setManager`, `addPost`, `removePost`, `setSchedule`, `setPublicWorks` |
 | people | `assign`, `unassign` (residence / employment / management / membership), `hire(post, person or pool)`, `dismiss(post)` |
-| authority | `appoint(office, holder)`, `vacate(office)`, `grantPermission`, `revokePermission` |
+| authority | `appoint(office, holder)`, `vacate(office)`, `grantPermission`, `revokePermission` (records only: what an office may do and who succeeds are Government's, DUP-62; Government's decisions issue these commands) |
 | money | `credit`, `debit` (host-side flows such as a quest reward), everything else moves money by itself |
 | time | `tick` |
 
@@ -92,8 +92,9 @@ JSON state, failed commands throw without changing state. One daily `tick` comma
    none assumed here.
 5. **Wages and rents**: posts pay their holders (named persons' accounts, or the pool's account that the adapter
    routes to the population model); leases pay rent; every payment is a ledger row.
-6. **Public works**: businesses flagged `publicWorks` are paid from the treasury by the same step; an office's
-   `tax` power, if the host grants it, runs here as data.
+6. **Public works**: businesses flagged `publicWorks` are paid from the treasury by the same step; tax is not
+   computed here: it runs in Government's own process phase and moves money through the ledger (`pay`/transfer via
+   `LedgerProvider`, CONTRACTS §3), DUP-62.
 7. **Expiry**: leases and permissions past `end` close; events emitted.
 
 **Queries** (pure functions over state): `holderOf(title)`, `titlesOf(holder)`, `tenantsOf(title)`,

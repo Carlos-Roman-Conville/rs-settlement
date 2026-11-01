@@ -46,8 +46,9 @@ callers). U16; 27 tests.
 What the code encodes of Rex's answers: a sale changes the holder and nothing else (U3); a title can refuse a
 buyer (U3, Q6); assignments never end on their own (U4); a business runs while its operator is away if a manager
 is available (U7, Q2); layouts change only through projects unless `config.freeLayout` is set (U8, Q8 default);
-the heir of an `inherit` is named by the host (no law of succession); offices grant permits only with the power
-(U10). The engine still names nobody (U12).
+the heir of an `inherit` is named by the caller (no law of succession); offices grant permits only with the power
+(U10), and what an office may do will be Government's (DUP-62, government/DESIGN.md §2.3). The engine still names
+nobody (U12).
 
 ## Read in this order
 
