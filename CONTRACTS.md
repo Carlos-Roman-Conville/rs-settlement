@@ -442,6 +442,14 @@ good rolls back every leg, with no row and no event. T4 nothing refuses on balan
 runs keep Settlement's tests, the harness goldens `settlement: A1` and `settlement: hamlet 30 days`, and the pirate
 `thirty-days.json` byte-identical. T6 an unknown currency throws and nothing moves.
 
+## 23. A currency leg's unit is `money` (correction to §22; proposed by the settlement keeper, agreed by the economy keeper, 2026-11-01)
+
+§22's "with unit = the currency id" is withdrawn. The kernel's `transfer()` parses `unit` against its fixed unit
+table, where `money` is the only dimension for value, so a currency id is not a unit. Every currency leg on
+`settlement.money` uses quantity = the currency id and unit = `money`, and `moneyLedger.unit(holder, currency)`
+returns `money` for every currency. Currencies stay apart because they are different quantities, not different
+units, and the kernel never converts between quantities. Nothing else in §22 changes.
+
 ## Log
 
 | Date | What |
@@ -457,3 +465,4 @@ runs keep Settlement's tests, the harness goldens `settlement: A1` and `settleme
 | 2026-11-01 | §20 (money and goods in one transfer) proposed by the economy keeper, agreed by the settlement keeper with five amendments (settlement's `reduce`/`Runner.run` seam, no event, batch order and time, each leg skipped on its own zero): Settlement's `pay` takes an optional goods leg as data and the live ledger in `opts`; Settlement-only replay moves the money leg alone, exactly |
 | 2026-11-01 | §21 (named holders' hours are netted by the client, REG-32) proposed by the settlement keeper, agreed by the economy keeper: §18's "left after grants" is for pools; Settlement staffing nets named grants across roles per tick (`namedUsed`), and a provider must not subtract them; no code changes in either engine |
 | 2026-11-01 | §22 (currencies and N-leg payments, MULTI-ECONOMY-DESIGN v2 S1–S5 and T1–T6) proposed by the settlement keeper, agreed by the economy keeper with two amendments (zero and self-pay money legs still write their row as in §20; `balance` of an unmoved currency is 0, of an unknown currency throws); one-currency runs stay byte-identical |
+| 2026-11-01 | §23 (a currency leg's unit is `money`, correcting §22's "unit = the currency id") proposed by the settlement keeper after 5266's gate failed on the kernel unit parser (I-1069), agreed by the economy keeper; quantity = currency id, unit = `money` |
