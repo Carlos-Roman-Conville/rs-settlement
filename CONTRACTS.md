@@ -343,6 +343,44 @@ never calls it, and staffing gains no rule: whether a person works for less than
 `hours(person, role, day)` returns 0 and staffing, which already caps a person at `hours`, assigns nothing. A
 provider without the method answers as if it returned null.
 
+## 20. Money and goods in one transfer (proposed by the economy keeper, agreed by the settlement keeper, 2026-11-01)
+
+A sale or purchase moves its money and its goods in one kernel `transfer()`, so both legs commit or neither does.
+`LedgerProvider.transfer` gains one optional argument, declared beside §3 and leaving its other arguments unchanged:
+
+```ts
+/** The goods leg of a paid exchange. `ledger` is the economy's goods TransferLedger, built by the economy inside
+ *  the command that calls `transfer`; `from` and `to` are its accounts (inventory ids), `good` its quantity (a good
+ *  id), `units` the amount (a finite number >= 0; fractions allowed). */
+goods?: { ledger: TransferLedger; from: string; to: string; good: string; units: number }
+```
+
+The host is the seam. It puts the data `{ from, to, good, units }` into Settlement's `pay` command as
+`goods?: { from, to, good, units }` and passes the live ledger beside the command, never in it, as
+`reduce(state, cmd, config, providers, opts?: { goods?: TransferLedger })` and `Runner.run(cmd, opts?)`. The command
+log stays plain JSON; `opts` is never logged.
+
+Settlement's `pay` with `goods` data and a ledger in `opts` builds one `transfer()` with the money leg on
+`moneyLedger(ctx)` and the goods leg on that ledger, and writes its existing ledger row (the caller's kind, `sale` or
+`purchase`) only after the transfer returns; `pay` emits no event today and gains none. If either leg throws, the
+kernel restores both ledgers, `pay` throws, and nothing is logged. The batch is the money request then the goods
+request, both at the settlement's day (`t = day * 86_400_000`); the goods request's process is `economy.trade.trade`.
+Zero `units` means no goods request: the money leg runs alone. A zero `amount` (or a holder paying itself) means no
+money request, as today: the goods leg runs alone. With neither, only the row is written, as today. A `pay` with a
+ledger in `opts` and no `goods` data is an error. `pay` without `goods` is byte-identical to today.
+
+Replay is exact, not a fallback. A `pay` whose batch failed threw and was never logged, so every logged `pay` with
+`goods` committed both legs; the goods leg writes only economy state, never a settlement key. So a `pay` with
+`goods` data and no ledger in `opts` (a Settlement-only replay) moves the money leg alone and reproduces
+Settlement's state byte for byte. The host's joint replay re-runs the economy's command, which rebuilds the goods
+leg on its side.
+
+The economy's `buy` and `sell` call `transfer` with `goods`, with the ledger built on their own command's state, so
+every goods write stays inside an economy command. They no longer move the goods themselves after the money. A
+trade with the market's own stall (one inventory on both sides) passes no `goods`. Goods moves without money
+(shipments, production, consumption, spoilage, take, takeMass, addMass, addStock) never go through `pay`; freight
+stays its own `freight` row. No leg refuses on balance: Q19 and ECON-26 stay open for Rex.
+
 ## Log
 
 | Date | What |
@@ -355,3 +393,4 @@ provider without the method answers as if it returned null.
 | 2026-10-30 | §17 (provider queries are pure) proposed by the settlement keeper after its Q20 prepass, agreed by the economy keeper; the economy adapter's `available` and `have` no longer mint an inventory for an unseen ref (pirate 6383414) |
 | 2026-10-30 | §18 (what `hours` returns; named holders in a wage quote) proposed by the economy keeper after reverting its lane's in-place edit of §16 (economy 4fb822a, d3ad33d), agreed by the settlement keeper: Settlement's `StubLabourSupply.hours` returns what is left after the day's grants and staffing caps a named holder at the post's hours |
 | 2026-11-01 | §19 (a person's reservation wage, IF-27) proposed by the economy keeper, agreed by the settlement keeper: an optional pure query read only by the economy's wage quote; no staffing rule (the decision is the person's, Cognition) |
+| 2026-11-01 | §20 (money and goods in one transfer) proposed by the economy keeper, agreed by the settlement keeper with five amendments (settlement's `reduce`/`Runner.run` seam, no event, batch order and time, each leg skipped on its own zero): Settlement's `pay` takes an optional goods leg as data and the live ledger in `opts`; Settlement-only replay moves the money leg alone, exactly |
