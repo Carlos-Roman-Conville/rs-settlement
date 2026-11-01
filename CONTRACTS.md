@@ -391,6 +391,57 @@ total per person for the tick, across all roles and posts, and grants each post 
 itself, or they are subtracted twice. Offers, refusals and their expiry are the provider's own policy and are outside
 this contract.
 
+## 22. Currencies and N-leg payments (MULTI-ECONOMY-DESIGN v2 S1–S5; proposed by the settlement keeper, agreed by the economy keeper, 2026-11-01)
+
+**Currency ids.** `money` is always a currency. Any other id is a currency only when Settlement's optional provider
+`currencies: { isCurrency(id: string): boolean }` says so; it is Economy's (`economy.money.currencies`) and pure (§17).
+With no provider only `money` exists. Any command naming an unknown currency throws `unknown currency: <id>`, and
+nothing moves. Settlement keeps no currency list and never decides acceptance.
+
+**Balances.** `Account.balance` stays the `money` balance. Other currencies live in `Account.balances?: {[currency]:
+number}`, an entry made at 0 on its first move. `moneyLedger` (`settlement.money`) takes the currency id as its
+quantity, with unit = the currency id. No balance check in any currency (Q19 / ECON-26 open).
+
+**Rows.** `Transaction` gains two optional fields: `currency` (absent means `money`) and `batch` (absent on a
+single-row call). `credit` and `debit` rows also gain `process` (below). A one-currency run writes no new field, so its
+state, rows and goldens stay byte-identical.
+
+**`pay`, two forms.**
+- *Single* (today's, §20): `{from, to, amount, kind, subject?, note?, currency?, goods?}`. One money leg in `currency`
+  (default `money`), at most one goods leg; one row; unchanged otherwise.
+- *N-leg*: `{kind, subject?, note?, legs: {money: {from, to, currency, amount}[], goods?: {from, to, good, units}[]}}`,
+  and none of the single form's `from`, `to`, `amount`, `currency` or `goods`. All legs go on one kernel `transfer()`:
+  money legs first in the order given, then goods legs in the order given, all at t = day·86_400_000 with process
+  `settlement.ledger.pay` (money) and `economy.trade.trade` (goods). A money leg with zero amount or from = to is left
+  out of the transfer but still writes its row, as in §20; a goods leg with zero units is left out. Each money leg
+  writes one row, in order, with its `currency`; every row of the call carries `batch` = the
+  first row's id. A call with no money legs (barter) writes no row and returns `[]`; otherwise it returns the row
+  ids. Goods legs need the live goods ledger in `opts` (§20); goods legs without it, or a ledger without goods legs,
+  throw. A refusal in any leg rolls back every leg: no row, no event. `pay` emits no event.
+- *Replay.* Settlement's log alone (no `opts`) moves every money leg exactly and no goods leg; the host's joint
+  replay rebuilds the goods legs (§20).
+
+**`LedgerProvider`** (§3) gains `balance(holder, currency?)` (default `money`) and
+`exchange(legs, kind, subject, note?, goods?: TransferLedger): string[]`, which runs the N-leg `pay`. `transfer` is
+unchanged and means `money`. `balance` of a currency the holder has never moved is 0; of an unknown currency it throws
+`unknown currency: <id>`.
+
+**Issue and retire.** `credit` and `debit` gain `currency?` and `process?`. A call naming a currency other than
+`money` must name a `process` (e.g. Government's monetary-authority command, carried by the host under `may`), else
+it throws `credit: a process is required`. The row records `currency` and `process`. These are the only moves that do
+not conserve; Settlement's own commands never call them.
+
+**Wages and rent.** `Post.currency?` and `Lease.currency?` (absent means `money`) name what the tick pays in. The
+currency a tax is owed in is Government's `legalTender`; Settlement levies no tax today and reads it when it does.
+
+**Refusals.** `not-accepted` is Economy's `shared.action.outcome`; Settlement writes nothing for it.
+
+**Tests (Settlement T1–T6).** T1 per currency, total = start + logged issues − logged retires, every day. T2 an N-leg
+replay from Settlement's log alone moves every money leg exactly and no goods leg. T3 a refused leg in any currency or
+good rolls back every leg, with no row and no event. T4 nothing refuses on balance in any currency. T5 one-currency
+runs keep Settlement's tests, the harness goldens `settlement: A1` and `settlement: hamlet 30 days`, and the pirate
+`thirty-days.json` byte-identical. T6 an unknown currency throws and nothing moves.
+
 ## Log
 
 | Date | What |
@@ -405,3 +456,4 @@ this contract.
 | 2026-11-01 | §19 (a person's reservation wage, IF-27) proposed by the economy keeper, agreed by the settlement keeper: an optional pure query read only by the economy's wage quote; no staffing rule (the decision is the person's, Cognition) |
 | 2026-11-01 | §20 (money and goods in one transfer) proposed by the economy keeper, agreed by the settlement keeper with five amendments (settlement's `reduce`/`Runner.run` seam, no event, batch order and time, each leg skipped on its own zero): Settlement's `pay` takes an optional goods leg as data and the live ledger in `opts`; Settlement-only replay moves the money leg alone, exactly |
 | 2026-11-01 | §21 (named holders' hours are netted by the client, REG-32) proposed by the settlement keeper, agreed by the economy keeper: §18's "left after grants" is for pools; Settlement staffing nets named grants across roles per tick (`namedUsed`), and a provider must not subtract them; no code changes in either engine |
+| 2026-11-01 | §22 (currencies and N-leg payments, MULTI-ECONOMY-DESIGN v2 S1–S5 and T1–T6) proposed by the settlement keeper, agreed by the economy keeper with two amendments (zero and self-pay money legs still write their row as in §20; `balance` of an unmoved currency is 0, of an unknown currency throws); one-currency runs stay byte-identical |
