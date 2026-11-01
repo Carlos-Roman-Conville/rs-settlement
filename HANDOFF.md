@@ -7,7 +7,7 @@
 - CONTRACTS.md has sections 17 (provider queries are pure), 18 (what hours returns; named wage holders) and 19 (a person's reservation wage, IF-27), each copied byte-identically from the economy keeper.
 - Kernel: settlement depends on `@rex/kernel` at tag v0.1.0, fetched from the backup mirror (690b1f7, unit 5064), not a folder link.
 - U25: `pay()` moves money through the kernel `transfer()` via `moneyLedger` in `src/money-ledger.ts` (4a9d127). Credit/debit and zero-amount deeds are not transfers. Whether a payer may go into debt is open (Rex's Q19).
-- Golden drift: TESTS.md has no `Golden drift` section yet, so unit 5092's outcome is not recorded here; read it there once it lands. Last recorded pirate golden: byte-identical after 2681 (`ae5fcdc`/`6383414`). Every task touching `src/` or `examples/` runs the settlement goldens in its Gate.
+- Golden drift: the two settlement goldens were re-recorded for `postFilled` (kernel d62287a, unit 5092); see TESTS.md `Golden drift` (8687fa4). Last pirate golden compare: byte-identical after 2681; the pirate-ship settlement and economy tests run in the Gate of 5093 (d57d0a3). Every task touching `src/` or `examples/` runs the settlement goldens in its Gate.
 
 ## Next
 - A shared `transfer()` batch pairing the money ledger with economy's goods ledger, after economy 5068 lands. It needs a design pass first, not a build.
