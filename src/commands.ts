@@ -175,7 +175,7 @@ export function grantTitle(ctx: Ctx, c: Extract<Command, { type: 'grantTitle' }>
   if (existing && existing.holder !== 'none') throw new Error(`subject already titled: ${existing.id}`)
   // The first title over a subject is setup (the host says who holds what); re-granting a vacated one is an act of
   // authority and needs an office with the power.
-  const authority = existing ? officeHas(ctx, c.authority, 'public-title') : (c.authority ?? null)
+  const authority = existing ? officeHas(ctx, c.authority, 'public-title', c.subject) : (c.authority ?? null)
   const id = existing?.id ?? newId(ctx, 'title')
   const txn = record(ctx, 'grant', existing?.holder ?? 'none', holder, id, 0, authority)
   if (existing) { existing.holder = holder; existing.since = txn; if (c.class) existing.class = c.class; return existing.id }
@@ -209,7 +209,7 @@ export function transfer(ctx: Ctx, c: Extract<Command, { type: 'transfer' }>): s
   const to = nonempty(c.to, 'to')
   if (entry.holder === to) throw new Error('already the holder')
   let authority: string | null = c.authority ?? null
-  if (c.kind === 'seizure') authority = officeHas(ctx, c.authority, 'seize')
+  if (c.kind === 'seizure') authority = officeHas(ctx, c.authority, 'seize', entry.subject)
   else if (entry.transferable.to && !entry.transferable.to.includes(to)) throw new Error(`title may not pass to ${to}`)
   const txn = record(ctx, c.kind, entry.holder, to, entry.id, 0, authority, c.note ?? '')
   changeHolder(ctx, entry.id, to, txn)
@@ -621,7 +621,7 @@ export function vacate(ctx: Ctx, c: Extract<Command, { type: 'vacate' }>): void 
 }
 
 export function grantPermission(ctx: Ctx, c: Extract<Command, { type: 'grantPermission' }>): string {
-  const office = officeHas(ctx, c.office, 'permit')
+  const office = officeHas(ctx, c.office, 'permit', c.subject)
   subjectExists(ctx, c.subject)
   const id = newId(ctx, 'perm')
   const txn = record(ctx, 'permit', office, c.subject, id, 0, office, c.kind)
@@ -634,7 +634,8 @@ export function grantPermission(ctx: Ctx, c: Extract<Command, { type: 'grantPerm
 }
 
 export function revokePermission(ctx: Ctx, c: Extract<Command, { type: 'revokePermission' }>): void {
-  const office = officeHas(ctx, c.office, 'permit')
+  const subject = ctx.state.permissions[c.permission]?.subject ?? null
+  const office = officeHas(ctx, c.office, 'permit', subject)
   const entry = must(ctx.state.permissions, c.permission, 'permission')
   entry.status = 'revoked'
   record(ctx, 'revoke', office, entry.subject, entry.id, 0, office)

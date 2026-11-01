@@ -317,12 +317,13 @@ describe('U22 office powers go through the AuthorityProvider (GOVERNMENT-SETTLEM
   })
 
   it('asks once with the office, power, null subject and current day', () => {
-    const { r, providers, parcel } = fresh()
+    const { r, providers } = fresh()
     const mayor = r.run<string>({ type: 'createOffice', name: 'mayor', powers: ['permit'] })
     r.run({ type: 'appoint', office: mayor, holder: 'estj-f' })
     const may = vi.fn(() => true)
     providers.authority = { may }
-    r.run({ type: 'grantPermission', office: mayor, kind: 'build', subject: parcel })
+    const ctx: Ctx = { state: r.state, config: r.config, providers, events: [], staffed: new Set() }
+    officeHas(ctx, mayor, 'permit')
     expect(may).toHaveBeenCalledExactlyOnceWith(mayor, 'permit', null, r.state.settlement.day)
   })
 
@@ -337,6 +338,66 @@ describe('U22 office powers go through the AuthorityProvider (GOVERNMENT-SETTLEM
     expect(() => officeHas(ctx, null, 'permit')).toThrow("an office with the power 'permit' is required")
     expect(() => officeHas(ctx, 'missing', 'permit')).toThrow(/office/)
     expect(may).not.toHaveBeenCalled()
+  })
+})
+
+describe('U23 the AuthorityProvider gets the land subject (GOVERNMENT-SETTLEMENT §2)', () => {
+  function setup() {
+    const ctx = fresh()
+    const office = ctx.r.run<string>({ type: 'createOffice', name: 'mayor', powers: [] })
+    ctx.r.run({ type: 'appoint', office, holder: 'estj-f' })
+    const may = vi.fn(() => true)
+    ctx.providers.authority = { may }
+    return { ...ctx, office, may }
+  }
+
+  it('re-granting a vacated title asks about its parcel', () => {
+    const { r, parcel, office, may } = setup()
+    const title = Object.values(r.state.titles).find((entry) => entry.subject === parcel)!.id
+    r.run({ type: 'transfer', title, to: 'none', kind: 'transfer' })
+    r.run({ type: 'grantTitle', subject: parcel, holder: 'town', authority: office })
+    expect(may).toHaveBeenCalledExactlyOnceWith(office, 'public-title', parcel, r.state.settlement.day)
+  })
+
+  it('a seizure asks about the title subject, not the title id', () => {
+    const { r, title, bldg, office, may } = setup()
+    r.run({ type: 'transfer', title, to: 'town', kind: 'seizure', authority: office })
+    expect(may).toHaveBeenCalledExactlyOnceWith(office, 'seize', bldg, r.state.settlement.day)
+  })
+
+  it('granting a permission asks about the command subject', () => {
+    const { r, parcel, office, may } = setup()
+    r.run({ type: 'grantPermission', office, kind: 'build', subject: parcel })
+    expect(may).toHaveBeenCalledExactlyOnceWith(office, 'permit', parcel, r.state.settlement.day)
+  })
+
+  it('revoking a permission asks about the recorded subject', () => {
+    const { r, bldg, office, may } = setup()
+    const permission = r.run<string>({ type: 'grantPermission', office, kind: 'build', subject: bldg })
+    may.mockClear()
+    r.run({ type: 'revokePermission', office, permission })
+    expect(may).toHaveBeenCalledExactlyOnceWith(office, 'permit', bldg, r.state.settlement.day)
+    expect(r.state.permissions[permission].status).toBe('revoked')
+  })
+
+  it('a missing permission passes null and still checks the office first', () => {
+    const { r, providers, office, may } = setup()
+    expect(() => r.run({ type: 'revokePermission', office, permission: 'missing' })).toThrow(/permission/)
+    expect(may).toHaveBeenCalledExactlyOnceWith(office, 'permit', null, r.state.settlement.day)
+    providers.authority = { may: () => false }
+    expect(() => r.run({ type: 'revokePermission', office, permission: 'missing' })).toThrow(/lacks the power/)
+  })
+
+  it('the same office can be refused on one subject and allowed on another', () => {
+    const { r, providers, parcel, bldg, office } = setup()
+    const may = vi.fn((_office: string, _power: string, subject: string | null) => subject !== parcel)
+    providers.authority = { may }
+    const before = structuredClone(r.state)
+    expect(() => r.run({ type: 'grantPermission', office, kind: 'build', subject: parcel })).toThrow(/lacks the power/)
+    expect(r.state).toEqual(before)
+    const permission = r.run<string>({ type: 'grantPermission', office, kind: 'build', subject: bldg })
+    expect(r.state.permissions[permission].subject).toBe(bldg)
+    expect(may.mock.calls.map((call) => call[2])).toEqual([parcel, bldg])
   })
 })
 
