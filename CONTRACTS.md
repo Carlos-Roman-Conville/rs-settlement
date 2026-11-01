@@ -327,6 +327,22 @@ holder offers the hours of the posts they hold, capped at those posts' hours, be
 otherwise unbounded and the quote would not be finite. A quote that is null or not finite is skipped and no
 `setWage` is issued for it.
 
+## 19. A person's reservation wage (IF-27; proposed by the economy keeper, agreed by the settlement keeper, 2026-11-01)
+
+`LabourSupply` gains one optional pure query (§17), declared beside the §16 block and leaving that block unchanged:
+
+```ts
+/** The least wage, in money per filled post-day (as `Post.wage`), a named person asks for a role today; null
+ *  when none is stated. The host answers it from the person's latest `work` intention (`terms.wage_min`). */
+reservationWage?(person: string, role: string, day: number): number | null
+```
+
+Only the economy calls it: in a wage quote, a named holder's offer is floored at their reservation wage. Settlement
+never calls it, and staffing gains no rule: whether a person works for less than they asked is the person's decision
+(Cognition). A mind that will not work at a post's wage says so with a `refuse_work` intention, after which
+`hours(person, role, day)` returns 0 and staffing, which already caps a person at `hours`, assigns nothing. A
+provider without the method answers as if it returned null.
+
 ## Log
 
 | Date | What |
@@ -338,3 +354,4 @@ otherwise unbounded and the quote would not be finite. A quote that is null or n
 | 2026-10-30 | §16 AGREED: the economy keeper's P1.md rev 2 text (Reality's supply rows) with the settlement keeper's amendments A (projects in person-hours) and B (`setInventory`); the settlement draft (3cd7bd8) and its interim agreed form (828091f) are withdrawn. From here, a change to §16 is a new section agreed by both keepers, never a swap of drafts |
 | 2026-10-30 | §17 (provider queries are pure) proposed by the settlement keeper after its Q20 prepass, agreed by the economy keeper; the economy adapter's `available` and `have` no longer mint an inventory for an unseen ref (pirate 6383414) |
 | 2026-10-30 | §18 (what `hours` returns; named holders in a wage quote) proposed by the economy keeper after reverting its lane's in-place edit of §16 (economy 4fb822a, d3ad33d), agreed by the settlement keeper: Settlement's `StubLabourSupply.hours` returns what is left after the day's grants and staffing caps a named holder at the post's hours |
+| 2026-11-01 | §19 (a person's reservation wage, IF-27) proposed by the economy keeper, agreed by the settlement keeper: an optional pure query read only by the economy's wage quote; no staffing rule (the decision is the person's, Cognition) |
