@@ -1,7 +1,7 @@
-# Government ↔ Settlement contract (AGREED 2026-10-31 by the Settlement keeper with one amendment; for the Government keeper to confirm)
+# Government ↔ Settlement contract (AGREED 2026-10-31, both keepers)
 
-**Status: AGREED by the Settlement keeper 2026-10-31, with one amendment marked inline as (settlement: ...); for the
-Government keeper to confirm.** Drafted by the Government keeper from the boundary both keepers agreed on 2026-10-31
+**Status: AGREED 2026-10-31 (both keepers).** The Settlement keeper's amendment is marked inline as
+(settlement: ...), confirmed by the Government keeper with no changes the same day. Drafted by the Government keeper from the boundary both keepers agreed on 2026-10-31
 (Government DESIGN §2.3, points 1–7, checked by the Settlement keeper) and the DUP-62 acceptance test both keepers
 agreed and sent to the registry keeper (owner split approved by Rex in overlap batch 2b, 2026-10-31). When agreed,
 this file and `Toolchain/settlement/GOVERNMENT-SETTLEMENT.md` hold the same text, byte for byte. Rules as for the
@@ -88,3 +88,4 @@ authority.
 |---|---|
 | 2026-10-31 | Proposed by the Government keeper from the agreed DESIGN §2.3 and DUP-62 acceptance test |
 | 2026-10-31 | Agreed by the Settlement keeper with one amendment (§1: `inherit` writes title holders, not office holders) |
+| 2026-10-31 | Confirmed by the Government keeper; AGREED (both keepers) |
