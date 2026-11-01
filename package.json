@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@rex/kernel": "file:../kernel"
+    "@rex/kernel": "git+file:///E:/backups/reality-sim/git/kernel.git#v0.1.0"
   },
   "devDependencies": {
     "typescript": "~6.0.2",
