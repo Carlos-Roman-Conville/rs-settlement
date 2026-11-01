@@ -158,3 +158,16 @@ VAL-S1, VAL-C1, VAL-W1 and VAL-R1 wait for the starting data (Q10).
 - Command: `npx --prefix "E:/AI Programs/Games/RPG's/pirate-ship/web" vitest run --root "E:/AI Programs/Games/RPG's/pirate-ship/web" src/economy/golden.test.ts` (that one test only).
 - Verdict: **byte-identical.** 1 test passed.
 - Differing fields: none. Nothing to attribute to 2617, 2618 or 2681.
+
+## Golden drift
+
+The kernel harness goldens `settlement: A1` and `settlement: hamlet 30 days` drifted after settlement 7e49d3c (unit
+3047, IF-27): `hire` now emits `postFilled` on every hire (2 events in A1, 1 in hamlet). With those events removed,
+both runs, state and ledger included, were byte-identical to the goldens, so the drift was intended, not a
+regression. The two goldens were re-recorded in the kernel repo by unit 5092, with the reason in
+`../kernel/harness/golden/SOURCE.md`. Settlement 690b1f7 (kernel v0.1.0 pin) and 4a9d127 (U25, money on kernel
+`transfer()`) changed nothing in them.
+
+Rule: every settlement task that changes `src/` or `examples/` runs `npx vitest run golden -t 'settlement: '` in
+`../kernel/harness` in its Gate. A golden that differs with no reason in a commit message or this file is a
+regression to fix, not a new golden.
