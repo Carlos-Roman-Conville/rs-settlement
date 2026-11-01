@@ -33,6 +33,126 @@
       "phase": "day.settlement"
     }
   ],
-  "ports": [],
+  "ports": [
+    {
+      "mechanism": "settlement.business.staffing",
+      "quantity": "contract.available_bool",
+      "kind": "quantity",
+      "unit": "1",
+      "direction": "in"
+    },
+    {
+      "mechanism": "settlement.business.staffing",
+      "quantity": "contract.labour_hours_left",
+      "kind": "quantity",
+      "unit": "person*h",
+      "direction": "in"
+    },
+    {
+      "mechanism": "settlement.business.staffing",
+      "quantity": "contract.labour_hours_granted",
+      "kind": "quantity",
+      "unit": "person*h",
+      "direction": "in"
+    },
+    {
+      "mechanism": "settlement.business.staffing",
+      "quantity": "contract.labour_pool_grants",
+      "kind": "record",
+      "unit": null,
+      "direction": "call"
+    },
+    {
+      "mechanism": "settlement.project.construction",
+      "quantity": "contract.labour_hours_granted",
+      "kind": "quantity",
+      "unit": "person*h",
+      "direction": "in"
+    },
+    {
+      "mechanism": "settlement.project.construction",
+      "quantity": "contract.labour_pool_grants",
+      "kind": "record",
+      "unit": null,
+      "direction": "call"
+    },
+    {
+      "mechanism": "settlement.production.labour_cap",
+      "quantity": "contract.productivity_factor",
+      "kind": "quantity",
+      "unit": "1",
+      "direction": "in"
+    },
+    {
+      "mechanism": "settlement.production.equipment_cap",
+      "quantity": "economy.unitsperfixtureday",
+      "kind": "quantity",
+      "unit": "count/(count*d)",
+      "direction": "in"
+    },
+    {
+      "mechanism": "settlement.production.labour_cap",
+      "quantity": "economy.labourhoursperunit",
+      "kind": "quantity",
+      "unit": "person*h/count",
+      "direction": "in"
+    },
+    {
+      "mechanism": "settlement.production.constraint_Q",
+      "quantity": "economy.output_units",
+      "kind": "quantity",
+      "unit": "count",
+      "direction": "in"
+    },
+    {
+      "mechanism": "settlement.production.constraint_Q",
+      "quantity": "economy.inputs_consumed",
+      "kind": "quantity",
+      "unit": "count",
+      "direction": "call"
+    },
+    {
+      "mechanism": "settlement.production.constraint_Q",
+      "quantity": "economy.outputs_and_byproducts_added",
+      "kind": "quantity",
+      "unit": "count",
+      "direction": "call"
+    },
+    {
+      "mechanism": "settlement.production.constraint_Q",
+      "quantity": "economy.market_producedtoday",
+      "kind": "quantity",
+      "unit": "count",
+      "direction": "call"
+    },
+    {
+      "mechanism": "settlement.project.construction",
+      "quantity": "contract.have",
+      "kind": "quantity",
+      "unit": "count",
+      "direction": "in"
+    },
+    {
+      "mechanism": "settlement.project.construction",
+      "quantity": "economy.stock_taken",
+      "kind": "quantity",
+      "unit": "count",
+      "direction": "in"
+    },
+    {
+      "mechanism": "settlement.project.construction",
+      "quantity": "economy.stock_taken",
+      "kind": "quantity",
+      "unit": "count",
+      "direction": "call"
+    },
+    {
+      "mechanism": "settlement.production.constraint_Q",
+      "quantity": "contract.utility_capacity",
+      "kind": "quantity",
+      "unit": "count/d",
+      "direction": "in"
+    }
+  ],
   "streams": []
 }
