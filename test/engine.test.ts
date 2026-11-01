@@ -43,6 +43,72 @@ function openShop(ctx: ReturnType<typeof fresh>, operator = 'butcher') {
   return { biz, p1, p2 }
 }
 
+describe('U24 a hire reports back to the intention that asked for it (IF-27)', () => {
+  it('emits one postFilled followed by one completed outcome carrying the cause and wage', () => {
+    const ctx = fresh()
+    const { r } = ctx
+    const { p1: post } = openShop(ctx)
+    const wage = r.state.posts[post].wage
+    r.events.length = 0
+    r.run({ type: 'hire', post, holder: 'esfp-f', cause: 'evt.intent.1' })
+    const filled = { type: 'postFilled', post, holder: 'esfp-f', wage, cause: 'evt.intent.1' }
+    expect(r.events).toEqual([filled, { type: 'shared.action.outcome', cause: 'evt.intent.1', status: 'completed',
+      stimuli: [{ post, holder: 'esfp-f', wage }], payload: filled }])
+  })
+
+  it.each([undefined, ''])('emits postFilled without a cause key or outcome when cause is %s', (cause) => {
+    const ctx = fresh()
+    const { r } = ctx
+    const { p1: post } = openShop(ctx)
+    r.events.length = 0
+    r.run({ type: 'hire', post, holder: 'esfp-f', ...(cause === undefined ? {} : { cause }) })
+    expect(r.events).toEqual([{ type: 'postFilled', post, holder: 'esfp-f', wage: r.state.posts[post].wage }])
+    expect(r.events[0]).not.toHaveProperty('cause')
+  })
+
+  it('emits postFilled for a pool holder on every hire', () => {
+    const ctx = fresh()
+    const { r } = ctx
+    const { p1: post } = openShop(ctx)
+    r.events.length = 0
+    for (let i = 0; i < 2; i++) r.run({ type: 'hire', post, holder: 'pool.housing' })
+    const filled = { type: 'postFilled', post, holder: 'pool.housing', wage: r.state.posts[post].wage }
+    expect(r.events).toEqual([filled, filled])
+  })
+
+  it('an unknown post throws without emitting either event or changing state or log', () => {
+    const ctx = fresh()
+    const { r } = ctx
+    openShop(ctx)
+    r.events.length = 0
+    const before = structuredClone(r.state)
+    const log = structuredClone(r.log)
+    expect(() => r.run({ type: 'hire', post: 'post.unknown', holder: 'esfp-f', cause: 'evt.intent.1' })).toThrow(/unknown post/)
+    expect(r.events).toEqual([])
+    expect(r.state).toEqual(before)
+    expect(r.log).toEqual(log)
+  })
+
+  it('replays the hire log with identical state and events', () => {
+    const ctx = fresh()
+    const { r } = ctx
+    const { p1, p2 } = openShop(ctx)
+    const from = structuredClone(r.state)
+    const rebuilt = fresh()
+    openShop(rebuilt)
+    r.log.length = 0
+    r.events.length = 0
+    r.run({ type: 'hire', post: p1, holder: 'esfp-f', cause: 'evt.intent.1' })
+    r.run({ type: 'hire', post: p2, holder: 'pool.housing', cause: 'evt.intent.2' })
+    r.run({ type: 'hire', post: p1, holder: 'butcher' })
+    const log = structuredClone(r.log)
+    const replayed = Runner.replay(log, r.config, rebuilt.providers, from)
+    expect(replayed.state).toEqual(r.state)
+    expect(replayed.events).toEqual(r.events)
+    expect(replayed.log).toEqual(log)
+  })
+})
+
 describe('U1 ids are stable and never reused', () => {
   it('replays mint the same ids; a retired parent stays queryable', () => {
     const a = fresh()

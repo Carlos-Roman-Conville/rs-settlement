@@ -47,7 +47,7 @@ export type Command =
   // people
   | { type: 'assign'; person: string; kind: AssignmentKind; target: string }
   | { type: 'unassign'; assignment: string }
-  | { type: 'hire'; post: string; holder: string }
+  | { type: 'hire'; post: string; holder: string; cause?: string }
   | { type: 'dismiss'; post: string }
   // authority
   | { type: 'createOffice'; name: string; powers: string[]; seat?: string | null }
@@ -584,6 +584,10 @@ export function hire(ctx: Ctx, c: Extract<Command, { type: 'hire' }>): void {
   if (entry.holder && entry.holder !== holder) dismiss(ctx, { type: 'dismiss', post: entry.id })
   entry.holder = holder
   if (!isPool(holder)) assign(ctx, { type: 'assign', person: holder, kind: 'employment', target: entry.id })
+  const filled = { type: 'postFilled' as const, post: entry.id, holder, wage: entry.wage, ...(c.cause ? { cause: c.cause } : {}) }
+  ctx.events.push(filled)
+  if (c.cause) ctx.events.push({ type: 'shared.action.outcome', cause: c.cause, status: 'completed',
+    stimuli: [{ post: entry.id, holder, wage: entry.wage }], payload: filled })
 }
 
 export function dismiss(ctx: Ctx, c: Extract<Command, { type: 'dismiss' }>): void {
