@@ -101,3 +101,12 @@ economy stay independent of the ghost and death question.
     (later) scripts/derive_map.py   requirements -> dimensions, districts, first parcels (step 3, no typed counts)
 
 Decay now uses the interim material classes (R-2, VALIDATION section 4b); intentionally, unclassified buildings no longer decay and are listed by `unvalidatedDecay`.
+
+## Releases
+
+- **v0.1.0** (2026-11-01): first release (CONTRACTS through §23, multi-currency `pay`). Install from the local
+  mirror: `"@rex/settlement": "git+file:///E:/backups/reality-sim/git/settlement.git#v0.1.0"`. It ships
+  TypeScript only (`exports` → `src/index.ts`): every consumer today runs it under vitest, and the pirate web and
+  Government also link the working tree with `file:`, which a compiled `dist/` would leave stale between releases.
+  A release adds `dist/` (kernel 5152's shape, with a rebuild-and-diff gate) once a consumer runs settlement under
+  plain `node`.
