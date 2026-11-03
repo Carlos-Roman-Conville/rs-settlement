@@ -178,7 +178,7 @@ export interface Project {
   permitRequired: boolean
   permit: string | null     // a permission id
   materialsDrawn: boolean
-  progress: number          // worker-days done
+  progress: number          // person-hours done
   status: 'active' | 'done' | 'cancelled'
   result: string | null     // a minted building or parcel id, on completion
 }
