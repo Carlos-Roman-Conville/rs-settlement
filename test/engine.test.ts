@@ -5,7 +5,7 @@ import { hasRightOfUse } from '../src/index.ts'
 import { Runner } from '../src/reduce.ts'
 import { initialState } from '../src/state.ts'
 import { defaultConfig } from '../src/config.ts'
-import { stubProviders, StubLabour, StubLabourSupply } from '../src/providers.ts'
+import { stubProviders, StubLabour, StubLabourSupply, officePowersAuthority, type AuthorityAnswer } from '../src/providers.ts'
 import { assignmentsOf, balanceOf, hasFixture, holderOf, ledger, physical, tenantsOf, totalMoney } from '../src/queries.ts'
 import { buildHamlet } from '../examples/hamlet.ts'
 import { officeHas, type Ctx } from '../src/context.ts'
@@ -44,6 +44,77 @@ function openShop(ctx: ReturnType<typeof fresh>, operator = 'butcher') {
   r.run({ type: 'credit', holder: biz, amount: 100 })
   return { biz, p1, p2 }
 }
+
+describe('U29 tagged may', () => {
+  it('the pure default provider permits held powers and preserves missing-power denial text', () => {
+    const { r, providers, parcel } = fresh()
+    expect(providers.authority).toBeUndefined()
+    const office = r.run<string>({ type: 'createOffice', name: 'mayor', powers: ['permit'] })
+    r.run({ type: 'appoint', office, holder: 'mayor-1' })
+    const before = canonical(r.state)
+    const authority = officePowersAuthority(r.state)
+    expect(authority.may(office, 'permit', parcel, r.state.settlement.day)).toEqual({ kind: 'yes' })
+    expect(authority.may(office, 'seize', parcel, r.state.settlement.day)).toEqual({ kind: 'no', reason: 'lacks power' })
+    expect(canonical(r.state)).toBe(before)
+    const permission = r.run<string>({ type: 'grantPermission', office, kind: 'build', subject: parcel })
+    expect(r.state.permissions[permission].grantedBy).toBe(office)
+    const clerk = r.run<string>({ type: 'createOffice', name: 'clerk', powers: [] })
+    r.run({ type: 'appoint', office: clerk, holder: 'clerk-1' })
+    expect(() => r.run({ type: 'grantPermission', office: clerk, kind: 'build', subject: parcel }))
+      .toThrow(`office ${clerk} lacks the power 'permit'`)
+  })
+
+  it.each(['grantTitle', 'transfer', 'grantPermission', 'revokePermission'] as const)(
+    '%s refuses unknown authority once without a state row, event, denial or queued command', (type) => {
+      const { r, providers, parcel, title } = fresh()
+      const office = r.run<string>({ type: 'createOffice', name: 'mayor', powers: ['permit', 'public-title', 'seize'] })
+      r.run({ type: 'appoint', office, holder: 'mayor-1' })
+      const permission = r.run<string>({ type: 'grantPermission', office, kind: 'build', subject: parcel })
+      const landTitle = Object.values(r.state.titles).find((entry) => entry.subject === parcel)!.id
+      r.run({ type: 'transfer', title: landTitle, to: 'none', kind: 'transfer' })
+      const may = vi.fn((): AuthorityAnswer => ({ kind: 'unknown', reads: ['gov.office.holder', 'gov.law.power'] }))
+      providers.authority = { may }
+      const state = canonical(r.state)
+      const events = canonical(r.events)
+      const log = canonical(r.log)
+      const commands = {
+        grantTitle: { type: 'grantTitle', subject: parcel, holder: 'town', authority: office },
+        transfer: { type: 'transfer', title, to: 'town', kind: 'seizure', authority: office },
+        grantPermission: { type: 'grantPermission', office, kind: 'build', subject: parcel },
+        revokePermission: { type: 'revokePermission', office, permission },
+      } as const
+      expect(() => r.run(commands[type])).toThrow('authority unresolved: gov.office.holder, gov.law.power')
+      expect(may).toHaveBeenCalledTimes(1)
+      expect(canonical(r.state)).toBe(state)
+      expect(canonical(r.events)).toBe(events)
+      expect(canonical(r.log)).toBe(log)
+    })
+
+  it.each([true, false, {}, { kind: 'invalid' }, null, undefined])('refuses an untagged answer %j', (answer) => {
+    const { r, providers, parcel } = fresh()
+    const office = r.run<string>({ type: 'createOffice', name: 'mayor', powers: ['permit'] })
+    r.run({ type: 'appoint', office, holder: 'mayor-1' })
+    providers.authority = { may: () => answer as unknown as AuthorityAnswer }
+    const before = canonical({ state: r.state, events: r.events, log: r.log })
+    expect(() => r.run({ type: 'grantPermission', office, kind: 'build', subject: parcel }))
+      .toThrow('authority provider returned an untagged answer')
+    expect(canonical({ state: r.state, events: r.events, log: r.log })).toBe(before)
+  })
+
+  it('replays thirty days without Government byte-identically', () => {
+    // The Gate also compares this no-Government scenario and the pirate run to their existing goldens.
+    const { r, providers } = buildHamlet()
+    const rebuilt = buildHamlet()
+    const from = structuredClone(r.state)
+    r.log.length = 0
+    r.events.length = 0
+    expect(providers.authority).toBeUndefined()
+    r.tick(30)
+    const replayed = Runner.replay(r.log, r.config, rebuilt.providers, from)
+    expect(canonical({ state: replayed.state, events: replayed.events, log: replayed.log }))
+      .toBe(canonical({ state: r.state, events: r.events, log: r.log }))
+  })
+})
 
 describe('U28 right of use query', () => {
   it.each([
@@ -403,7 +474,7 @@ describe('U22 office powers go through the AuthorityProvider (GOVERNMENT-SETTLEM
     const { r, providers, parcel } = fresh()
     const mayor = r.run<string>({ type: 'createOffice', name: 'mayor', powers: ['permit'] })
     r.run({ type: 'appoint', office: mayor, holder: 'estj-f' })
-    providers.authority = { may: () => false }
+    providers.authority = { may: () => ({ kind: 'no', reason: 'lacks power' }) }
     const before = structuredClone(r.state)
     expect(() => r.run({ type: 'grantPermission', office: mayor, kind: 'build', subject: parcel }))
       .toThrow(`office ${mayor} lacks the power 'permit'`)
@@ -415,7 +486,7 @@ describe('U22 office powers go through the AuthorityProvider (GOVERNMENT-SETTLEM
     const { r, providers, parcel } = fresh()
     const clerk = r.run<string>({ type: 'createOffice', name: 'clerk', powers: [] })
     r.run({ type: 'appoint', office: clerk, holder: 'clerk-1' })
-    providers.authority = { may: () => true }
+    providers.authority = { may: () => ({ kind: 'yes' }) }
     const permit = r.run<string>({ type: 'grantPermission', office: clerk, kind: 'build', subject: parcel })
     expect(r.state.permissions[permit].grantedBy).toBe(clerk)
   })
@@ -424,7 +495,7 @@ describe('U22 office powers go through the AuthorityProvider (GOVERNMENT-SETTLEM
     const { r, providers } = fresh()
     const mayor = r.run<string>({ type: 'createOffice', name: 'mayor', powers: ['permit'] })
     r.run({ type: 'appoint', office: mayor, holder: 'estj-f' })
-    const may = vi.fn(() => true)
+    const may = vi.fn((): AuthorityAnswer => ({ kind: 'yes' }))
     providers.authority = { may }
     const ctx: Ctx = { state: r.state, config: r.config, providers, events: [], staffed: new Set() }
     officeHas(ctx, mayor, 'permit')
@@ -434,7 +505,7 @@ describe('U22 office powers go through the AuthorityProvider (GOVERNMENT-SETTLEM
   it('rejects vacant, null and unknown offices before asking the provider', () => {
     const { r, providers, parcel } = fresh()
     const mayor = r.run<string>({ type: 'createOffice', name: 'mayor', powers: ['permit'] })
-    const may = vi.fn(() => true)
+    const may = vi.fn((): AuthorityAnswer => ({ kind: 'yes' }))
     providers.authority = { may }
     expect(() => r.run({ type: 'grantPermission', office: mayor, kind: 'build', subject: parcel }))
       .toThrow(`office is vacant: ${mayor}`)
@@ -450,7 +521,7 @@ describe('U23 the AuthorityProvider gets the land subject (GOVERNMENT-SETTLEMENT
     const ctx = fresh()
     const office = ctx.r.run<string>({ type: 'createOffice', name: 'mayor', powers: [] })
     ctx.r.run({ type: 'appoint', office, holder: 'estj-f' })
-    const may = vi.fn(() => true)
+    const may = vi.fn((): AuthorityAnswer => ({ kind: 'yes' }))
     ctx.providers.authority = { may }
     return { ...ctx, office, may }
   }
@@ -488,13 +559,14 @@ describe('U23 the AuthorityProvider gets the land subject (GOVERNMENT-SETTLEMENT
     const { r, providers, office, may } = setup()
     expect(() => r.run({ type: 'revokePermission', office, permission: 'missing' })).toThrow(/permission/)
     expect(may).toHaveBeenCalledExactlyOnceWith(office, 'permit', null, r.state.settlement.day)
-    providers.authority = { may: () => false }
+    providers.authority = { may: () => ({ kind: 'no', reason: 'lacks power' }) }
     expect(() => r.run({ type: 'revokePermission', office, permission: 'missing' })).toThrow(/lacks the power/)
   })
 
   it('the same office can be refused on one subject and allowed on another', () => {
     const { r, providers, parcel, bldg, office } = setup()
-    const may = vi.fn((_office: string, _power: string, subject: string | null) => subject !== parcel)
+    const may = vi.fn((_office: string, _power: string, subject: string | null): AuthorityAnswer =>
+      subject !== parcel ? { kind: 'yes' } : { kind: 'no', reason: 'lacks power' })
     providers.authority = { may }
     const before = structuredClone(r.state)
     expect(() => r.run({ type: 'grantPermission', office, kind: 'build', subject: parcel })).toThrow(/lacks the power/)

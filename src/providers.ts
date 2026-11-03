@@ -46,14 +46,17 @@ export interface PriceProvider {
   valueOf(subject: string, day: number): number
 }
 
+export type AuthorityAnswer = { kind: 'yes' } | { kind: 'no'; reason: string } | { kind: 'unknown'; reads: string[] }
+
 export interface AuthorityProvider {
   /** Pure (CONTRACTS §17): may this office exercise this power over this subject on this day?
    *  GOVERNMENT-SETTLEMENT.md §2. */
-  may(office: string, power: string, subject: string | null, day: number): boolean
+  may(office: string, power: string, subject: string | null, day: number): AuthorityAnswer
 }
 
 export function officePowersAuthority(state: SettlementState): AuthorityProvider {
-  return { may: (office, power) => state.offices[office]?.powers.includes(power) ?? false }
+  return { may: (office, power) => state.offices[office]?.powers.includes(power)
+    ? { kind: 'yes' } : { kind: 'no', reason: 'lacks power' } }
 }
 
 export interface CurrencyProvider { isCurrency(id: string): boolean }

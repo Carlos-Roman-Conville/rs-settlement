@@ -151,8 +151,13 @@ export function officeHas(ctx: Ctx, office: string | null | undefined, power: st
   if (!office) throw new Error(`an office with the power '${power}' is required`)
   const found = must(ctx.state.offices, office, 'office')
   if (!found.holder) throw new Error(`office is vacant: ${office}`)
-  if (!(ctx.providers.authority ?? officePowersAuthority(ctx.state)).may(office, power, subject, ctx.state.settlement.day)) {
-    throw new Error(`office ${office} lacks the power '${power}'`)
+  const answer = (ctx.providers.authority ?? officePowersAuthority(ctx.state)).may(office, power, subject, ctx.state.settlement.day)
+  if (answer && typeof answer === 'object') {
+    switch (answer.kind) {
+      case 'yes': return office
+      case 'no': throw new Error(`office ${office} lacks the power '${power}'`)
+      case 'unknown': throw new Error(`authority unresolved: ${answer.reads.join(', ')}`)
+    }
   }
-  return office
+  throw new Error('authority provider returned an untagged answer')
 }
