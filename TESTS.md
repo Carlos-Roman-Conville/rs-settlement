@@ -21,6 +21,7 @@ alignment command the `AlignmentState` JSON is byte-identical to a run without t
 
 | Id | Rule under test | Must hold |
 |---|---|---|
+| U32 | decay runs during a repair (`test/validation.test.ts`) | a stalled repair with no labour drawn decays exactly as no project; completed repair work raises that building's condition; full rates cross band boundaries with no repair floor; V6 remains unchanged |
 | U31 | no permit, no draw (`test/engine.test.ts`) | without a required permit, provider stock is unchanged and `materialsDrawn` stays false; granting a permit lets the next tick draw; `permitRequired: false` draws as before |
 | U30 | funding holds (`test/engine.test.ts`) | per-currency available subtracts active remainders; over-holds and duplicate refs are refused; release moves no money; each settle writes one payment carrying its ref and conserves currency; partial settlement, closed holds, rollback and replay work; unheld pay may drive available negative (Q19 open); no holds key in runs without holds |
 | U29 | tagged may (`test/engine.test.ts`) | pure default yes/no preserves permission grants and denial text; unknown authority leaves canonical state, events and command log unchanged across authority commands; untagged answers are refused; thirty-day replay is exact and the Gate checks unchanged kernel and pirate goldens without Government |
@@ -45,6 +46,18 @@ alignment command the `AlignmentState` JSON is byte-identical to a run without t
 | U20 | inventory rebinding | setInventory validates the business and ref; the next tick consumes the new inventory |
 | U17 | setWage is the only wage channel | over ten ticks `Post.wage` never changes and each day's `wage` row equals it; `setWage` changes it and the next row follows; `.wage =` is written only by `addPost` and `setWage` (Q19 open: may a payer go into debt) |
 | U12 | the engine names nobody | every person id in a state came from a command; `LabourProvider.draw` returns pool ids, never a person the host did not register |
+
+### U32 mechanism record (PRODUCTION)
+
+1. Rule: interim class decay applies every day to every standing building; an open repair does not suspend it
+   (PLAN 3.9; SET-47). Proportional reduction and a floor are not adopted (no source). Valid for buildings with a
+   class and exposure; others keep today's no-decay case.
+2. Inputs: building condition, decay class, exposure, bands. Output: condition [0, 1]. Owner: Settlement.
+3. Parameters: unchanged (`yearsToRuin` sourced per class; band shares level 5, fixture; SET-20 open).
+4. Daily, step 1 of the tick; explicit, no iteration.
+5. Tests U32: functional (a), (b); boundary (c); V6 range check.
+6. Validation evidence: VAL-D1 is verification only; none for the interval (SET-20).
+7. Status: designed → implemented by this unit.
 
 ### U31 mechanism record (PRODUCTION)
 

@@ -288,6 +288,58 @@ function decayBuilding(decayClass?: string, exposure?: string) {
   return { r, bldg, parcel }
 }
 
+describe('U32 decay runs during a repair', () => {
+  it('a stalled repair with no labour drawn decays exactly like no project over 30 ticks', () => {
+    const { r, bldg } = decayBuilding('palm-thatch')
+    const control = decayBuilding('palm-thatch')
+    const draw = vi.spyOn(r.providers.labour, 'draw')
+    const project = r.run<string>({ type: 'startProject', kind: 'repair', target: bldg, account: 'owner', labourHours: 100 })
+    for (let day = 0; day < 30; day++) {
+      r.tick()
+      control.r.tick()
+      expect(r.state.projects[project]).toMatchObject({ status: 'active', progress: 0 })
+      expect(r.state.buildings[bldg].condition).toBe(control.r.state.buildings[control.bldg].condition)
+    }
+    expect(draw).toHaveBeenCalledTimes(30)
+    expect(draw.mock.results.every((result) => result.value === 0)).toBe(true)
+    expect(r.state.buildings[bldg].condition).toBeLessThan(1)
+  })
+
+  it('completed modelled repair work still raises the decaying building condition', () => {
+    const { r, bldg } = decayBuilding('palm-thatch')
+    const providers = stubProviders()
+    providers.labour.pools['pool.repair'] = 1
+    r.providers = providers
+    r.run({ type: 'setCondition', bldg, condition: 0.3 })
+    const project = r.run<string>({ type: 'startProject', kind: 'repair', target: bldg, account: 'owner',
+      pool: 'pool.repair', labourHours: 20, plan: { condition: 0.8 } })
+    r.tick()
+    expect(r.state.projects[project]).toMatchObject({ status: 'active', progress: 10 })
+    expect(r.state.buildings[bldg].condition).toBeLessThan(0.3)
+    r.tick()
+    expect(r.state.projects[project]).toMatchObject({ status: 'done', progress: 20 })
+    expect(r.state.buildings[bldg].condition).toBe(0.8)
+    expect(r.state.buildings[bldg].condition).toBeGreaterThan(0.3)
+  })
+
+  it('an open repair applies the full rate across band boundaries with no repair floor', () => {
+    const { r, bldg } = decayBuilding('palm-thatch')
+    // Fixture lifetime gives the independently specified daily losses in VAL-D1.
+    r.config.decayClasses['palm-thatch'].yearsToRuin = 850 / 365
+    const project = r.run<string>({ type: 'startProject', kind: 'repair', target: bldg, account: 'owner', labourHours: 100 })
+    for (const [condition, loss] of [[0.8, 0.0005], [0.5, 0.001], [0.2, 0.002]]) {
+      r.run({ type: 'setCondition', bldg, condition })
+      r.tick()
+      expect(r.state.buildings[bldg].condition).toBe(condition - loss)
+      expect(r.state.buildings[bldg].condition).toBeLessThan(condition)
+      expect(r.state.projects[project]).toMatchObject({ status: 'active', progress: 0 })
+    }
+    expect(bandOf(r.config, r.state.buildings[bldg].condition).name).toBe('ruined')
+    r.tick()
+    expect(r.state.buildings[bldg].condition).toBe(0.2 - 0.002)
+  })
+})
+
 describe('VAL-D1 years from new to ruined by material class', () => {
   // Independent bounds transcribed from VALIDATION section 4b; 50 is the interim tile/slate estimate.
   const ranges: Record<string, [number, number]> = {
@@ -330,19 +382,26 @@ describe('VAL-D1 years from new to ruined by material class', () => {
     expect(r.state.buildings[bldg].condition).toBe(1 - (1 - 0.9) / 400)
   })
 
-  it('host exposure scales time and an active repair suspends decay', () => {
+  it('host exposure scales time and a stalled repair leaves decay unchanged', () => {
     const { r, bldg } = decayBuilding('palm-thatch')
     r.config.exposure['test-factor'] = 2
     r.run({ type: 'setDecayClass', bldg, decayClass: 'palm-thatch', exposure: 'test-factor' })
     r.tick()
     const loss = (1 - r.config.bands[0].min) / ((400 / 850) * 5 * 365 * 2)
     expect(r.state.buildings[bldg].condition).toBe(1 - loss)
+    const control = decayBuilding('palm-thatch')
+    control.r.config.exposure['test-factor'] = 2
+    control.r.run({ type: 'setDecayClass', bldg: control.bldg, decayClass: 'palm-thatch', exposure: 'test-factor' })
+    control.r.tick()
     const project = r.run<string>({ type: 'startProject', kind: 'repair', target: bldg, account: 'owner', labourHours: 100 })
     r.tick(3)
-    expect(r.state.buildings[bldg].condition).toBe(1 - loss)
+    control.r.tick(3)
+    expect(r.state.projects[project]).toMatchObject({ status: 'active', progress: 0 })
+    expect(r.state.buildings[bldg].condition).toBe(control.r.state.buildings[control.bldg].condition)
     r.run({ type: 'cancelProject', project })
     r.tick()
-    expect(r.state.buildings[bldg].condition).toBe(1 - loss - loss)
+    control.r.tick()
+    expect(r.state.buildings[bldg].condition).toBe(control.r.state.buildings[control.bldg].condition)
   })
 
   it('construction preserves classes and commands reject unknown host classifications atomically', () => {

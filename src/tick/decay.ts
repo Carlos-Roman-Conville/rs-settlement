@@ -1,12 +1,10 @@
-// Step 1: sourced material lifetimes scale the proposed band shape; repair suspends decay.
+// Step 1: sourced material lifetimes scale the proposed band shape; decay runs whether or not a repair is open.
 import { bandOf } from '../config.ts'
 import type { Ctx } from '../context.ts'
 
 export function decay(ctx: Ctx): void {
-  const repairing = new Set(Object.values(ctx.state.projects)
-    .filter((entry) => entry.status === 'active' && entry.kind === 'repair').map((entry) => entry.target))
   for (const bldg of Object.values(ctx.state.buildings)) {
-    if (bldg.demolishedOn !== null || repairing.has(bldg.id)) continue
+    if (bldg.demolishedOn !== null) continue
     const years = bldg.decayClass === undefined ? null : ctx.config.decayClasses[bldg.decayClass]?.yearsToRuin
     const exposure = ctx.config.exposure[bldg.exposure ?? 'sheltered']
     if (years == null || exposure == null) continue
