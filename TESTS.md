@@ -21,6 +21,7 @@ alignment command the `AlignmentState` JSON is byte-identical to a run without t
 
 | Id | Rule under test | Must hold |
 |---|---|---|
+| U33 | shared equipment (`test/engine.test.ts`) | fixture-days are shared in business, line and premises order at each recipe's rate; separate fixtures retain their Q; condition scales capacity only with explicit `band-factor`; default and absent mean `none`; replay is stable and Q20 throws before any produce |
 | U32 | decay runs during a repair (`test/validation.test.ts`) | a stalled repair with no labour drawn decays exactly as no project; completed repair work raises that building's condition; full rates cross band boundaries with no repair floor; V6 remains unchanged |
 | U31 | no permit, no draw (`test/engine.test.ts`) | without a required permit, provider stock is unchanged and `materialsDrawn` stays false; granting a permit lets the next tick draw; `permitRequired: false` draws as before |
 | U30 | funding holds (`test/engine.test.ts`) | per-currency available subtracts active remainders; over-holds and duplicate refs are refused; release moves no money; each settle writes one payment carrying its ref and conserves currency; partial settlement, closed holds, rollback and replay work; unheld pay may drive available negative (Q19 open); no holds key in runs without holds |
@@ -46,6 +47,20 @@ alignment command the `AlignmentState` JSON is byte-identical to a run without t
 | U20 | inventory rebinding | setInventory validates the business and ref; the next tick consumes the new inventory |
 | U17 | setWage is the only wage channel | over ten ticks `Post.wage` never changes and each day's `wage` row equals it; `setWage` changes it and the next row follows; `.wage =` is written only by `addPost` and `setWage` (Q19 open: may a payer go into debt) |
 | U12 | the engine names nobody | every person id in a state came from a command; `LabourProvider.draw` returns pool ids, never a person the host did not register |
+
+### U33 mechanism record (PRODUCTION)
+
+1. Rule: per shared fixture, sum of machine time used <= machine time available per day, converted to output by
+   each recipe's rate, allocated in declared stable order (PLAN 3.4, 3.6; SET-46; Q15 default in-order, Rex may
+   set another policy). Leontief per line (level 4). Valid for fixtures in usable premises.
+2. Inputs: fixtures, condition bands, `unitsPerFixtureDay` (Economy recipe, [H]), line order. Outputs: Q per line,
+   use per fixture (transient). Units: fixture-days, output units per day. Owner: Settlement (allocation), Economy (rates).
+3. Parameters: `outputFactor` 1/0.9/0.6/0 (level 5, fixture, no source -> Reality DUP-9), applied only when a host
+   selects `band-factor` (SET-54); `unitsPerFixtureDay` host. Optional `equipmentCondition` defaults to `none`.
+4. Daily, step 4, explicit in order; two passes (check, then produce) with the same allocation.
+5. Tests U33: functional (a)-(d); conservation sum of use <= capacity (a), (b); replay (e); boundary (f).
+6. Validation evidence: none yet (VAL-S1 has no shop-output series).
+7. Status: designed -> implemented by this unit. Divisibility (SET-49) and utilities sharing stay open.
 
 ### U32 mechanism record (PRODUCTION)
 

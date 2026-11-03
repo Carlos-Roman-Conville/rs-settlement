@@ -48,6 +48,146 @@ function openShop(ctx: ReturnType<typeof fresh>, operator = 'butcher') {
   return { biz, p1, p2 }
 }
 
+describe('U33 shared equipment', () => {
+  function equipped() {
+    const ctx = fresh()
+    for (const recipe of Object.values(ctx.providers.materials.recipes)) recipe.labourHoursPerUnit = 0
+    ctx.providers.materials.set('inv.shop', 'meat', 100)
+    ctx.providers.materials.set('inv.shop', 'salt', 100)
+    const biz = ctx.r.run<string>({ type: 'openBusiness', kind: 'workshop',
+      premises: [{ bldg: ctx.bldg, rooms: ['shop'] }], operator: 'butcher', inventory: 'inv.shop',
+      lines: [
+        { recipe: 'salt-meat', equipment: ['salting-house'] },
+        { recipe: 'smoked-meat', equipment: ['salting-house'] },
+      ] })
+    return { ...ctx, biz }
+  }
+
+  it('(a) shares fixture-days across lines at their own rates, first line first', () => {
+    for (const salt of [5, 100]) {
+      const { r, providers, biz } = equipped()
+      providers.materials.set('inv.shop', 'salt', salt)
+      r.tick()
+      const q = r.state.production[biz].lines.map((line) => line.q)
+      expect(q).toEqual(salt === 5 ? [5, 3] : [10, 0])
+      expect(q[0] / 10 + q[1] / 6).toBeLessThanOrEqual(1)
+      expect(providers.materials.get('inv.shop', 'salt-meat')).toBe(q[0])
+      expect(providers.materials.get('inv.shop', 'smoked-meat')).toBe(q[1])
+    }
+  })
+
+  it('(b) allocates a shared building to businesses in insertion order', () => {
+    const { r, providers, biz, bldg } = equipped()
+    r.run({ type: 'setLines', biz, lines: [{ recipe: 'salt-meat', equipment: ['salting-house'] }] })
+    providers.materials.set('inv.shop', 'salt', 5)
+    providers.materials.set('inv.second', 'meat', 100)
+    const second = r.run<string>({ type: 'openBusiness', kind: 'workshop', premises: [{ bldg }],
+      operator: 'butcher', inventory: 'inv.second', lines: [{ recipe: 'smoked-meat', equipment: ['salting-house'] }] })
+    r.tick()
+    const q = [biz, second].map((id) => r.state.production[id].lines[0].q)
+    expect(q).toEqual([5, 3])
+    expect(q[0] / 10 + q[1] / 6).toBeLessThanOrEqual(1)
+  })
+
+  it('(c) preserves independent fixture capacities and consumes every required kind', () => {
+    const { r, biz, bldg } = equipped()
+    r.config.freeLayout = true
+    r.run({ type: 'addFixture', bldg, fixture: 'smokehouse', by: 'butcher' })
+    r.run({ type: 'setLines', biz, lines: [
+      { recipe: 'salt-meat', equipment: ['salting-house'] },
+      { recipe: 'smoked-meat', equipment: ['smokehouse'] },
+    ] })
+    r.tick()
+    expect(r.state.production[biz].lines.map((line) => line.q)).toEqual([10, 6])
+    r.run({ type: 'setLines', biz, lines: [
+      { recipe: 'salt-meat', equipment: ['salting-house', 'smokehouse'] },
+      { recipe: 'smoked-meat', equipment: ['smokehouse'] },
+    ] })
+    r.tick()
+    expect(r.state.production[biz].lines.map((line) => line.q)).toEqual([10, 0])
+  })
+
+  it('(d) scales shared capacity once only with band-factor; default and absent mean none', () => {
+    expect(defaultConfig().equipmentCondition).toBe('none')
+    for (const mode of ['band-factor', 'none', undefined] as const) {
+      for (const condition of [0.3, 1]) {
+        const { r, providers, biz, bldg } = equipped()
+        if (mode === undefined) delete r.config.equipmentCondition
+        else r.config.equipmentCondition = mode
+        providers.materials.recipes['smoked-meat'].unitsPerFixtureDay = 10
+        providers.materials.set('inv.shop', 'salt', 3)
+        r.run({ type: 'setCondition', bldg, condition })
+        r.tick()
+        const q = r.state.production[biz].lines.map((line) => line.q)
+        expect(q).toEqual(mode === 'band-factor' && condition === 0.3 ? [3, 3] : [3, 7])
+        expect(r.state.production[biz].lines[0].caps.equipment).toBe(mode === 'band-factor' && condition === 0.3 ? 6 : 10)
+      }
+    }
+  })
+
+  it('(e) replays the same inputs with identical line outputs and stable allocation order', () => {
+    const first = equipped()
+    const second = equipped()
+    for (const { providers } of [first, second]) providers.materials.set('inv.shop', 'salt', 5)
+    const from = structuredClone(first.r.state)
+    first.r.log.length = 0
+    first.r.events.length = 0
+    first.r.tick(2)
+    const replayed = Runner.replay(first.r.log, second.r.config, second.providers, from)
+    expect(first.r.state.production[first.biz].lines.map((line) => line.q)).toEqual([0, 6])
+    expect(replayed.state.production[second.biz].lines.map((line) => line.q)).toEqual([0, 6])
+    expect(replayed.state).toEqual(first.r.state)
+    expect(replayed.events).toEqual(first.r.events)
+    expect(second.providers.materials.stock).toEqual(first.providers.materials.stock)
+  })
+
+  it('(f) checks Q20 after shared lines before any produce and leaves their outputs unchanged', () => {
+    const { r, providers, biz } = equipped()
+    providers.materials.set('inv.shop', 'salt', 5)
+    r.tick()
+    expect(r.state.production[biz].lines.map((line) => line.q)).toEqual([5, 3])
+    providers.materials.set('inv.shop', 'salt', 5)
+    providers.materials.recipes.free = { inputs: [], output: 'free', yield: 1, unitsPerFixtureDay: 0, labourHoursPerUnit: 0 }
+    r.run({ type: 'setLines', biz, lines: [...r.state.businesses[biz].lines, { recipe: 'free', equipment: [] }] })
+    const before = structuredClone(r.state)
+    const stock = structuredClone(providers.materials.stock)
+    const produce = vi.spyOn(providers.materials, 'produce')
+    expect(() => r.tick()).toThrow(`open for Rex (Q20): non-finite production Q for business ${biz}, line 3, recipe free`)
+    expect(produce).not.toHaveBeenCalled()
+    expect(r.state).toEqual(before)
+    expect(r.state.production[biz].lines.map((line) => line.q)).toEqual([5, 3])
+    expect(providers.materials.stock).toEqual(stock)
+  })
+
+  it('takes fixture-days from premises in declared order and counts each physical fixture once', () => {
+    const { r, providers, biz, bldg, parcel } = equipped()
+    const other = r.run<string>({ type: 'addBuilding', parcel, footprint: { x: 0, y: 0, w: 1, h: 1 }, fixtures: ['salting-house'] })
+    r.run({ type: 'grantTitle', subject: other, holder: 'butcher' })
+    r.run({ type: 'closeBusiness', biz })
+    providers.materials.set('inv.shop', 'salt', 15)
+    const across = r.run<string>({ type: 'openBusiness', kind: 'workshop',
+      premises: [{ bldg: other }, { bldg }, { bldg: other }], operator: 'butcher', inventory: 'inv.shop',
+      lines: [{ recipe: 'salt-meat', equipment: ['salting-house'] }] })
+    const later = [other, bldg].map((building) => r.run<string>({ type: 'openBusiness', kind: 'workshop',
+      premises: [{ bldg: building }], operator: 'butcher', inventory: 'inv.shop',
+      lines: [{ recipe: 'smoked-meat', equipment: ['salting-house'] }] }))
+    r.tick()
+    expect([across, ...later].map((id) => r.state.production[id].lines[0].q)).toEqual([15, 0, 3])
+    expect(r.state.production[across].lines[0].caps.equipment).toBe(20)
+  })
+
+  it('zero rates consume nothing and demolished fixtures supply no capacity', () => {
+    const { r, providers, biz, bldg } = equipped()
+    providers.materials.recipes['salt-meat'].unitsPerFixtureDay = 0
+    r.tick()
+    expect(r.state.production[biz].lines.map((line) => line.q)).toEqual([0, 6])
+    // A host-loaded open business may still refer to a demolished building.
+    r.state.buildings[bldg].demolishedOn = r.state.settlement.day
+    r.tick()
+    expect(r.state.production[biz].lines.map((line) => line.q)).toEqual([0, 0])
+  })
+})
+
 describe('U31 no permit, no draw', () => {
   function project(permitRequired: boolean) {
     const ctx = fresh()

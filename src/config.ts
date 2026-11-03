@@ -11,6 +11,7 @@ export interface SettlementConfig {
   freeLayout: boolean             // may a title holder setLayout without a project (Q8; default no)
   hoursPerDay: number             // a full post's day, for labour arithmetic
   labourSharing: string          // proposed: in-order until Rex answers Q15
+  equipmentCondition?: 'band-factor' | 'none' // proposed: absent means none; band-factor is a coarse approximation
   tickOrder: readonly string[]
 }
 
@@ -38,6 +39,7 @@ export function defaultConfig(): SettlementConfig {
     freeLayout: false,
     hoursPerDay: 10,
     labourSharing: 'in-order',
+    equipmentCondition: 'none',
     tickOrder: TICK_ORDER,
   }
 }
