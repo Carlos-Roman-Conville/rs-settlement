@@ -70,6 +70,11 @@ export const balanceOf = (state: SettlementState, holder: string, currency = 'mo
 export const totalOf = (state: SettlementState, currency: string): number =>
   Object.values(state.accounts).reduce((sum, account) => sum + (currency === 'money' ? account.balance : account.balances?.[currency] ?? 0), 0)
 
+/** Unheld payments may spend held funds (Q19 open), so available can be negative. */
+export const availableOf = (state: SettlementState, holder: string, currency = 'money'): number =>
+  balanceOf(state, holder, currency) - Object.values(state.holds ?? {}).reduce((sum, hold) =>
+    sum + (hold.account === holder && hold.currency === currency && hold.status === 'active' ? hold.amount - hold.settled : 0), 0)
+
 export const totalMoney = (state: SettlementState): number => totalOf(state, 'money')
 
 export function mapLayer(state: SettlementState): { districts: { id: string; kind: string; bounds: Rect }[]; parcels: { id: string; district: string; footprint: Rect; vacant: boolean }[] } {

@@ -102,6 +102,15 @@ export interface Transaction {
 
 export interface Account { id: string; holder: string; balance: number; balances?: Record<string, number> }
 
+export interface Hold {
+  ref: string
+  account: string          // opaque holder, as in pay and balanceOf
+  amount: number
+  currency: string
+  status: 'active' | 'released' | 'settled'
+  settled: number
+}
+
 export interface ProductionLine {
   recipe: string            // opaque; its rates come from MaterialProvider.rates each tick (CONTRACTS.md s13a)
   equipment: string[]       // fixture ids the line needs (any count; more fixtures, more output)
@@ -214,6 +223,7 @@ export interface SettlementState {
   leases: Record<string, Lease>
   ledger: Transaction[]
   accounts: Record<string, Account>
+  holds?: Record<string, Hold>
   businesses: Record<string, Business>
   posts: Record<string, Post>
   assignments: Record<string, Assignment>

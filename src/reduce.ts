@@ -66,6 +66,9 @@ export function reduce(state: SettlementState, command: Command, config: Settlem
     case 'credit': handlers.credit(ctx, command); break
     case 'debit': handlers.debit(ctx, command); break
     case 'pay': result = handlers.payCommand(ctx, command); break
+    case 'hold': handlers.hold(ctx, command); break
+    case 'release': handlers.release(ctx, command); break
+    case 'settle': result = handlers.settle(ctx, command); break
     case 'setWage': handlers.setWage(ctx, command); break
     case 'tick':
       // Reject invalid wage/rent currencies before projects, staffing or production mutate host providers.

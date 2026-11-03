@@ -1,12 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
 import ts from 'typescript'
 import { canonical } from '@rex/kernel'
+import * as kernel from '@rex/kernel'
+import * as commands from '../src/commands.ts'
+import * as ticks from '../src/tick/index.ts'
 import { hasRightOfUse } from '../src/index.ts'
 import { Runner } from '../src/reduce.ts'
 import { initialState } from '../src/state.ts'
 import { defaultConfig } from '../src/config.ts'
 import { stubProviders, StubLabour, StubLabourSupply, officePowersAuthority, type AuthorityAnswer } from '../src/providers.ts'
-import { assignmentsOf, balanceOf, hasFixture, holderOf, ledger, physical, tenantsOf, totalMoney } from '../src/queries.ts'
+import { assignmentsOf, availableOf, balanceOf, hasFixture, holderOf, ledger, physical, tenantsOf, totalMoney, totalOf } from '../src/queries.ts'
 import { buildHamlet } from '../examples/hamlet.ts'
 import { officeHas, type Ctx } from '../src/context.ts'
 
@@ -44,6 +47,196 @@ function openShop(ctx: ReturnType<typeof fresh>, operator = 'butcher') {
   r.run({ type: 'credit', holder: biz, amount: 100 })
   return { biz, p1, p2 }
 }
+
+describe('U30 funding holds', () => {
+  function funded() {
+    const r = new Runner(initialState('stl.holds', 'holds'))
+    r.run({ type: 'credit', holder: 'payer', amount: 100 })
+    return r
+  }
+
+  it('(a) a hold within available reserves funds without a payment or balance change', () => {
+    const r = funded()
+    const rows = structuredClone(r.state.ledger)
+    r.run({ type: 'hold', account: 'payer', amount: 60, ref: 'decision.1' })
+    expect(r.state.holds).toEqual({ 'decision.1': {
+      ref: 'decision.1', account: 'payer', amount: 60, currency: 'money', status: 'active', settled: 0,
+    } })
+    expect(availableOf(r.state, 'payer')).toBe(40)
+    expect(balanceOf(r.state, 'payer')).toBe(100)
+    expect(availableOf(r.state, 'other')).toBe(0)
+    expect(r.state.ledger).toEqual(rows)
+  })
+
+  it('(b) a second hold above the remainder is refused without changing state or log', () => {
+    const r = funded()
+    r.run({ type: 'hold', account: 'payer', amount: 60, ref: 'decision.1' })
+    const before = canonical({ state: r.state, events: r.events, log: r.log })
+    expect(() => r.run({ type: 'hold', account: 'payer', amount: 41, ref: 'decision.2' }))
+      .toThrow('hold: 41 exceeds available 40 on payer')
+    expect(canonical({ state: r.state, events: r.events, log: r.log })).toBe(before)
+    r.run({ type: 'hold', account: 'payer', amount: 40, ref: 'decision.2' })
+    expect(availableOf(r.state, 'payer')).toBe(0)
+  })
+
+  it.each(['active', 'released', 'settled'] as const)('(c) duplicate refs throw even when %s', (status) => {
+    const r = funded()
+    r.run({ type: 'hold', account: 'payer', amount: 60, ref: 'decision.1' })
+    if (status === 'released') r.run({ type: 'release', ref: 'decision.1' })
+    if (status === 'settled') r.run({ type: 'settle', ref: 'decision.1', payee: 'payee' })
+    const before = canonical(r.state)
+    expect(() => r.run({ type: 'hold', account: 'other', amount: 0, ref: 'decision.1' })).toThrow('duplicate ref')
+    expect(canonical(r.state)).toBe(before)
+  })
+
+  it('(d) release frees available without changing balances or adding a ledger row', () => {
+    const r = funded()
+    r.run({ type: 'hold', account: 'payer', amount: 60, ref: 'decision.1' })
+    const rows = structuredClone(r.state.ledger)
+    r.run({ type: 'release', ref: 'decision.1' })
+    expect(r.state.holds!['decision.1']).toMatchObject({ status: 'released', settled: 0 })
+    expect(availableOf(r.state, 'payer')).toBe(100)
+    expect(balanceOf(r.state, 'payer')).toBe(100)
+    expect(r.state.ledger).toEqual(rows)
+  })
+
+  it('(e) full settle uses one kernel transfer and one payment with the ref, conserving money', () => {
+    const r = funded()
+    r.run({ type: 'hold', account: 'payer', amount: 60, ref: 'decision.1' })
+    const total = totalOf(r.state, 'money')
+    const rows = r.state.ledger.length
+    const transfer = vi.spyOn(kernel, 'transfer')
+    try {
+      const txn = r.run<string>({ type: 'settle', ref: 'decision.1', payee: 'payee' })
+      expect(transfer).toHaveBeenCalledTimes(1)
+      expect(r.state.ledger.slice(rows)).toEqual([{
+        id: txn, day: 0, kind: 'transfer', from: 'payer', to: 'payee', subject: 'decision.1',
+        amount: 60, authority: null, note: '',
+      }])
+    } finally { transfer.mockRestore() }
+    expect(r.state.holds!['decision.1']).toMatchObject({ status: 'settled', settled: 60 })
+    expect(balanceOf(r.state, 'payer')).toBe(40)
+    expect(balanceOf(r.state, 'payee')).toBe(60)
+    expect(availableOf(r.state, 'payer')).toBe(40)
+    expect(totalOf(r.state, 'money')).toBe(total)
+  })
+
+  it('(f) partial settle keeps the remainder held until release', () => {
+    const r = funded()
+    r.run({ type: 'hold', account: 'payer', amount: 60, ref: 'decision.1' })
+    r.run({ type: 'settle', ref: 'decision.1', payee: 'payee', amount: 25 })
+    expect(r.state.holds!['decision.1']).toMatchObject({ status: 'active', settled: 25 })
+    expect(availableOf(r.state, 'payer')).toBe(40)
+    expect(balanceOf(r.state, 'payer')).toBe(75)
+    const rows = structuredClone(r.state.ledger)
+    r.run({ type: 'release', ref: 'decision.1' })
+    expect(r.state.holds!['decision.1']).toMatchObject({ status: 'released', settled: 25 })
+    expect(availableOf(r.state, 'payer')).toBe(75)
+    expect(balanceOf(r.state, 'payer')).toBe(75)
+    expect(r.state.ledger).toEqual(rows)
+    expect(ledger(r.state, { subject: 'decision.1' })).toHaveLength(1)
+    expect(ledger(r.state, { subject: 'decision.1' })[0].amount).toBe(25)
+  })
+
+  it('(g) settle above the remaining hold throws without a payment or state change', () => {
+    const r = funded()
+    r.run({ type: 'hold', account: 'payer', amount: 60, ref: 'decision.1' })
+    r.run({ type: 'settle', ref: 'decision.1', payee: 'payee', amount: 25 })
+    const before = canonical({ state: r.state, events: r.events, log: r.log })
+    expect(() => r.run({ type: 'settle', ref: 'decision.1', payee: 'payee', amount: 36 })).toThrow('exceeds remainder 35')
+    expect(canonical({ state: r.state, events: r.events, log: r.log })).toBe(before)
+  })
+
+  it('(h) holds and payments are isolated by holder and declared currency', () => {
+    const r = funded()
+    r.providers.currencies = { isCurrency: (id) => id === 'silver' }
+    r.run({ type: 'credit', holder: 'payer', amount: 80, currency: 'silver', process: 'test.issue' })
+    r.run({ type: 'hold', account: 'payer', amount: 60, ref: 'money.1' })
+    r.run({ type: 'hold', account: 'payer', amount: 70, ref: 'silver.1', currency: 'silver' })
+    expect(availableOf(r.state, 'payer')).toBe(40)
+    expect(availableOf(r.state, 'payer', 'silver')).toBe(10)
+    expect(availableOf(r.state, 'other', 'silver')).toBe(0)
+    const total = totalOf(r.state, 'silver')
+    const rows = r.state.ledger.length
+    r.run({ type: 'settle', ref: 'silver.1', payee: 'payee' })
+    expect(r.state.ledger.slice(rows)).toHaveLength(1)
+    expect(r.state.ledger[rows]).toMatchObject({ from: 'payer', to: 'payee', subject: 'silver.1', amount: 70, currency: 'silver' })
+    expect(r.state.holds!['silver.1']).toMatchObject({ currency: 'silver', status: 'settled', settled: 70 })
+    expect(balanceOf(r.state, 'payee', 'silver')).toBe(70)
+    expect(availableOf(r.state, 'payer', 'silver')).toBe(10)
+    expect(availableOf(r.state, 'payer')).toBe(40)
+    expect(totalOf(r.state, 'silver')).toBe(total)
+  })
+
+  it.each(['hold', 'tick'] as const)('(i) a hold created inside a failing %s reduce is rolled back', (type) => {
+    const r = funded()
+    const before = canonical({ state: r.state, events: r.events, log: r.log })
+    const create = commands.hold
+    const fail = (ctx: Ctx) => {
+      create(ctx, { type: 'hold', account: 'payer', amount: 60, ref: 'rolled-back' })
+      expect(ctx.state.holds!['rolled-back'].status).toBe('active')
+      throw new Error('failure after hold')
+    }
+    // Inject a failure after a real hold mutation on the reducer's copied state.
+    const handler = type === 'hold' ? vi.spyOn(commands, 'hold').mockImplementation(fail)
+      : vi.spyOn(ticks, 'tick').mockImplementation(fail)
+    try {
+      expect(() => r.run(type === 'hold' ? { type, account: 'payer', amount: 60, ref: 'rolled-back' } : { type }))
+        .toThrow('failure after hold')
+    } finally { handler.mockRestore() }
+    expect(r.state).not.toHaveProperty('holds')
+    expect(canonical({ state: r.state, events: r.events, log: r.log })).toBe(before)
+  })
+
+  it('(j) unheld pay may spend held funds and drive available negative (Q19 open)', () => {
+    const r = funded()
+    r.run({ type: 'hold', account: 'payer', amount: 60, ref: 'decision.1' })
+    const hold = structuredClone(r.state.holds)
+    r.run({ type: 'pay', from: 'payer', to: 'payee', amount: 80, kind: 'purchase' })
+    expect(balanceOf(r.state, 'payer')).toBe(20)
+    expect(availableOf(r.state, 'payer')).toBe(-40)
+    expect(r.state.holds).toEqual(hold)
+    expect(r.state.ledger.at(-1)).toMatchObject({ from: 'payer', to: 'payee', amount: 80 })
+  })
+
+  it.each(['released', 'settled'] as const)('a %s hold cannot be settled again', (status) => {
+    const r = funded()
+    r.run({ type: 'hold', account: 'payer', amount: 60, ref: 'decision.1' })
+    if (status === 'released') r.run({ type: 'release', ref: 'decision.1' })
+    else r.run({ type: 'settle', ref: 'decision.1', payee: 'payee' })
+    const before = canonical(r.state)
+    expect(() => r.run({ type: 'settle', ref: 'decision.1', payee: 'payee' })).toThrow(`is ${status}`)
+    expect(canonical(r.state)).toBe(before)
+  })
+
+  it('default settle pays only the remainder and the hold command log replays exactly', () => {
+    const r = funded()
+    r.run({ type: 'hold', account: 'payer', amount: 60, ref: 'decision.1' })
+    r.run({ type: 'settle', ref: 'decision.1', payee: 'payee', amount: 25 })
+    r.run({ type: 'settle', ref: 'decision.1', payee: 'payee' })
+    r.run({ type: 'hold', account: 'payer', amount: 10, ref: 'decision.2' })
+    r.run({ type: 'release', ref: 'decision.2' })
+    expect(ledger(r.state, { subject: 'decision.1' }).map((row) => row.amount)).toEqual([25, 35])
+    expect(r.state.holds!['decision.1']).toMatchObject({ status: 'settled', settled: 60 })
+    expect(availableOf(r.state, 'payer')).toBe(40)
+    const replayed = Runner.replay(r.log, r.config, r.providers, initialState('stl.holds', 'holds'))
+    expect(canonical(replayed.state)).toBe(canonical(r.state))
+    expect(replayed.events).toEqual(r.events)
+  })
+
+  it('no holds key is written by ordinary runs, queries or refused holds', () => {
+    const r = funded()
+    r.run({ type: 'pay', from: 'payer', to: 'payee', amount: 10, kind: 'purchase' })
+    r.tick()
+    const before = canonical(r.state)
+    expect(availableOf(r.state, 'payer')).toBe(90)
+    expect(() => r.run({ type: 'hold', account: 'payer', amount: 91, ref: 'too-much' })).toThrow('exceeds available')
+    expect(() => r.run({ type: 'hold', account: 'payer', amount: 1, ref: 'unknown', currency: 'unknown' }))
+      .toThrow('unknown currency')
+    expect(r.state).not.toHaveProperty('holds')
+    expect(canonical(r.state)).toBe(before)
+  })
+})
 
 describe('U29 tagged may', () => {
   it('the pure default provider permits held powers and preserves missing-power denial text', () => {

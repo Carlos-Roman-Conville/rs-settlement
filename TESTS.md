@@ -21,6 +21,7 @@ alignment command the `AlignmentState` JSON is byte-identical to a run without t
 
 | Id | Rule under test | Must hold |
 |---|---|---|
+| U30 | funding holds (`test/engine.test.ts`) | per-currency available subtracts active remainders; over-holds and duplicate refs are refused; release moves no money; each settle writes one payment carrying its ref and conserves currency; partial settlement, closed holds, rollback and replay work; unheld pay may drive available negative (Q19 open); no holds key in runs without holds |
 | U29 | tagged may (`test/engine.test.ts`) | pure default yes/no preserves permission grants and denial text; unknown authority leaves canonical state, events and command log unchanged across authority commands; untagged answers are refused; thirty-day replay is exact and the Gate checks unchanged kernel and pirate goldens without Government |
 | U28 | right of use query (`test/engine.test.ts`) | opaque title holder and active tenant allowed; ended tenant, stranger and untitled building refused; canonical state JSON unchanged; query agrees with the command check; parcel-title fallback and lease title matching preserved |
 | U27 | currencies and N-leg payments (`test/multi-currency.test.ts`, §22 T1–T6) | per-currency conservation through 30 wage/rent days and logged issue/retire; exact exchange and barter deltas in one transfer; settlement-only replay; atomic rollback; debt allowed; one-currency fields unchanged; unknown currencies refused; process required for non-money issue/retire |
@@ -43,6 +44,18 @@ alignment command the `AlignmentState` JSON is byte-identical to a run without t
 | U20 | inventory rebinding | setInventory validates the business and ref; the next tick consumes the new inventory |
 | U17 | setWage is the only wage channel | over ten ticks `Post.wage` never changes and each day's `wage` row equals it; `setWage` changes it and the next row follows; `.wage =` is written only by `addPost` and `setWage` (Q19 open: may a payer go into debt) |
 | U12 | the engine names nobody | every person id in a state came from a command; `LabourProvider.draw` returns pool ids, never a person the host did not register |
+
+### U30 mechanism record (PRODUCTION)
+
+1. Rule: per currency, available = balance minus active hold remainders; over-holds are refused and settle uses one
+   transfer (GOV-31; GOVERNMENT-SETTLEMENT item 5; SET-53; PLATFORM section 7a). Any holder and declared currency.
+2. Inputs: account, amount, ref, currency, payee. Outputs: hold records and one payment row per settle. Units: the
+   currency's units. Owner: Settlement.
+3. Parameters: none. Unheld spending may touch held funds today; Q19 remains open.
+4. Applied per command inside the reduce transaction; holds replay with the command log.
+5. U30: functional (a), (d)-(f), (h); conservation (e); rollback (i); boundaries (b), (c), (g), (j).
+6. Validation evidence: none yet; accounting identity only.
+7. Status: implemented from the agreed design. Economy's LedgerProvider (item 5e) is a separate unit.
 
 ## Adapter tests (`Games/RPG's/pirate-ship/web/src/settlement/*.test.ts`)
 

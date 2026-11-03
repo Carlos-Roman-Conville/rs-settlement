@@ -6,6 +6,7 @@ import { moneyLedger } from './money-ledger.ts'
 import { isPool } from './ids.ts'
 import { contains, overlaps, union, type AssignmentKind, type Layout, type Placement, type ProductionLine, type ProjectKind, type ProjectPlan, type Rect, type Room, type Transferable } from './state.ts'
 import { bandOf } from './config.ts'
+import { availableOf } from './queries.ts'
 
 export type Command =
   // land
@@ -57,6 +58,9 @@ export type Command =
   | { type: 'grantPermission'; office: string; kind: string; subject: string; expires?: number | null }
   | { type: 'revokePermission'; permission: string; office: string }
   // money
+  | { type: 'hold'; account: string; amount: number; ref: string; currency?: string }
+  | { type: 'release'; ref: string }
+  | { type: 'settle'; ref: string; payee: string; amount?: number }
   | { type: 'credit'; holder: string; amount: number; note?: string; currency?: string; process?: string }
   | { type: 'debit'; holder: string; amount: number; note?: string; currency?: string; process?: string }
   | { type: 'pay'; from: string; to: string; amount: number; kind: string; subject?: string | null; note?: string;
@@ -651,6 +655,40 @@ export function revokePermission(ctx: Ctx, c: Extract<Command, { type: 'revokePe
 }
 
 // money
+
+export function hold(ctx: Ctx, c: Extract<Command, { type: 'hold' }>): void {
+  const ref = nonempty(c.ref, 'ref')
+  if (Object.hasOwn(ctx.state.holds ?? {}, ref)) throw new Error(`hold: duplicate ref ${ref}`)
+  const account = nonempty(c.account, 'account')
+  const amount = finite(c.amount, 'amount', 0)
+  const currency = currencyOf(ctx, c.currency)
+  const available = availableOf(ctx.state, account, currency)
+  if (amount > available) throw new Error(`hold: ${amount} exceeds available ${available} on ${account}`)
+  ctx.state.holds = { ...ctx.state.holds, [ref]: { ref, account, amount, currency, status: 'active', settled: 0 } }
+}
+
+function activeHold(ctx: Ctx, ref: string) {
+  nonempty(ref, 'ref')
+  if (!Object.hasOwn(ctx.state.holds ?? {}, ref)) throw new Error(`unknown hold: ${ref}`)
+  const entry = ctx.state.holds![ref]
+  if (entry.status !== 'active') throw new Error(`hold ${ref} is ${entry.status}`)
+  return entry
+}
+
+export function release(ctx: Ctx, c: Extract<Command, { type: 'release' }>): void {
+  activeHold(ctx, c.ref).status = 'released'
+}
+
+export function settle(ctx: Ctx, c: Extract<Command, { type: 'settle' }>): string {
+  const entry = activeHold(ctx, c.ref)
+  const remainder = entry.amount - entry.settled
+  const amount = finite(c.amount ?? remainder, 'amount', 0)
+  if (amount > remainder) throw new Error(`settle: ${amount} exceeds remainder ${remainder} on ${c.ref}`)
+  const txn = pay(ctx, entry.account, nonempty(c.payee, 'payee'), amount, 'transfer', entry.ref, null, '', undefined, entry.currency)
+  entry.settled = amount === remainder ? entry.amount : entry.settled + amount
+  if (amount === remainder) entry.status = 'settled'
+  return txn
+}
 
 export function credit(ctx: Ctx, c: Extract<Command, { type: 'credit' }>): void {
   const currency = currencyOf(ctx, c.currency)
