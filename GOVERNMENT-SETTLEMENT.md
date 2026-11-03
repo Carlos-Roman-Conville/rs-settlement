@@ -82,6 +82,38 @@ authority.
 - **Government:** serve `AuthorityProvider.may` from `empower` laws (Government's unit, after the law evaluator);
   a combined test with Settlement's real commands for tests 1–3.
 
+## Tagged `may` and funding holds (AGREED 2026-11-02, Government and Settlement keepers; Rex's condition of the same day)
+
+Staged in HQ; it is landed as a new section of GOVERNMENT-SETTLEMENT.md in both repos by a composer copy unit after the
+build stop lifts. Nothing earlier in the file is edited.
+
+1. **Tagged `may`.** `AuthorityProvider.may(office, power, subject, day)` returns `{ kind: 'yes' } | { kind: 'no', reason }
+   | { kind: 'unknown', reads: string[] }`; no bare object a truthy check could pass. The default `officePowersAuthority`
+   returns `{ kind: 'yes' }` or `{ kind: 'no', reason: 'lacks power' }`, with today's denial text unchanged. The query stays
+   pure (Settlement CONTRACTS §17).
+2. **Unknown is refused, never permitted, never a denial (Rex).** `officeHas` (`settlement/src/context.ts:153`, five call
+   sites) throws `authority unresolved: <reads joined by ', '>`, a text distinct from the denial texts. The command does
+   nothing, writes no row, and is not recorded as a denial. The host retries once the read resolves. Settlement keeps no
+   pending-command queue.
+3. With Government absent the thirty-day run is byte-identical (GOV-8 item 4).
+4. Physical acts outside Settlement's command boundary never call `may` (GOV-25, Rex). `holder` changes only through an
+   accepted `appoint`.
+5. **Funding holds (GOV-31), owned by Settlement.**
+   a) `hold(account, amount, ref, currency = 'money')` creates one record in a new `holds` state per ref; a duplicate ref
+      throws. Per currency, available = balance − Σ active holds. A hold with amount > available is refused, so two
+      decisions cannot promise the same funds.
+   b) `release(ref)` ends the hold and moves no money. `settle(ref, payee, amount?)` is one kernel `transfer()` from the
+      held account to the payee; the amount defaults to the whole hold. A partial settle keeps the remainder held until
+      it is released, and an amount above the hold throws.
+   c) Holds are encumbrances, not ledger money rows. A settle writes one ordinary payment row carrying the ref. Holds
+      replay deterministically. A hold made in a tick or transaction that rolls back is undone.
+   d) Unheld payments keep today's behaviour (no balance refusal), so an unheld `pay` can drive available below zero.
+      This is recorded as visible, and no rule is added. Whether unheld spending may touch held funds is Rex's question
+      (Settlement Q19), still open.
+   e) Economy's LedgerProvider gains `available` and the hold verbs in a separate CONTRACTS section with the Economy
+      keeper, not this one.
+   The shape matches Economy's reserve/release/fulfil material holds (ST-6) and the kernel's time ledger.
+
 ## Log
 
 | Date | What |
