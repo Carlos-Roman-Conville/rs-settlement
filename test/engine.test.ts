@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import ts from 'typescript'
+import { canonical } from '@rex/kernel'
+import { hasRightOfUse } from '../src/index.ts'
 import { Runner } from '../src/reduce.ts'
 import { initialState } from '../src/state.ts'
 import { defaultConfig } from '../src/config.ts'
@@ -42,6 +44,42 @@ function openShop(ctx: ReturnType<typeof fresh>, operator = 'butcher') {
   r.run({ type: 'credit', holder: biz, amount: 100 })
   return { biz, p1, p2 }
 }
+
+describe('U28 right of use query', () => {
+  it.each([
+    { name: 'title holder with an opaque household id', who: 'household.1', tenant: false, ended: false, titled: true, allowed: true },
+    { name: 'active tenant', who: 'household.2', tenant: true, ended: false, titled: true, allowed: true },
+    { name: 'tenant whose lease ended', who: 'household.2', tenant: true, ended: true, titled: true, allowed: false },
+    { name: 'stranger', who: 'household.3', tenant: false, ended: false, titled: true, allowed: false },
+    { name: 'building with no title', who: 'household.1', tenant: false, ended: false, titled: false, allowed: false },
+  ])('$name: pure query agrees with the command check', ({ who, tenant, ended, titled, allowed }) => {
+    const { r, bldg, title } = fresh()
+    r.run({ type: 'transfer', title, to: 'household.1', kind: 'gift' })
+    if (tenant) {
+      const lease = r.run<string>({ type: 'lease', title, tenant: who, scope: 'whole', rent: 1 })
+      if (ended) r.run({ type: 'endLease', lease })
+    }
+    if (!titled) r.state.titles = {}
+    const before = canonical(r.state)
+    expect(hasRightOfUse(r.state, who, bldg)).toBe(allowed)
+    expect(canonical(r.state)).toBe(before)
+    const open = () => r.run({ type: 'openBusiness', kind: 'shop', premises: [{ bldg }], operator: who, inventory: 'inv.shop' })
+    if (allowed) expect(open).not.toThrow()
+    else expect(open).toThrow(`${who} has no right of use over ${bldg} (no title, no lease)`)
+  })
+
+  it('uses the parcel title when no building title is held, and ignores leases on other titles', () => {
+    const { r, bldg, title, parcel } = fresh()
+    const parcelTitle = Object.values(r.state.titles).find((entry) => entry.subject === parcel)!
+    r.run({ type: 'lease', title: parcelTitle.id, tenant: 'household.2', scope: 'whole', rent: 1 })
+    expect(hasRightOfUse(r.state, 'household.2', bldg)).toBe(false)
+    delete r.state.titles[title]
+    const before = canonical(r.state)
+    expect(hasRightOfUse(r.state, 'butcher', bldg)).toBe(true)
+    expect(hasRightOfUse(r.state, 'household.2', bldg)).toBe(true)
+    expect(canonical(r.state)).toBe(before)
+  })
+})
 
 describe('U24 a hire reports back to the intention that asked for it (IF-27)', () => {
   it('emits one postFilled followed by one completed outcome carrying the cause and wage', () => {

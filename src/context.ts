@@ -8,7 +8,7 @@ import type { SettlementEvent } from './events.ts'
 import { mint, type Prefix } from './ids.ts'
 import { moneyLedger } from './money-ledger.ts'
 import { officePowersAuthority, type Providers } from './providers.ts'
-import { titleOver as queryTitleOver } from './queries.ts'
+import { hasRightOfUse as queryHasRightOfUse, titleOver as queryTitleOver } from './queries.ts'
 import type { ReduceOpts } from './reduce.ts'
 import type { Account, Building, Business, Lease, Parcel, Post, Project, SettlementState, Title, TransactionKind } from './state.ts'
 
@@ -144,10 +144,7 @@ export function titleOver(ctx: Ctx, subject: string): Title | null {
 
 /** Who may use a building: its title holder, or a tenant with an active lease on that title. */
 export function hasRightOfUse(ctx: Ctx, who: string, bldg: string): boolean {
-  const owner = titleOver(ctx, bldg)
-  if (!owner) return false
-  if (owner.holder === who) return true
-  return Object.values(ctx.state.leases).some((entry) => entry.title === owner.id && entry.tenant === who && entry.status === 'active')
+  return queryHasRightOfUse(ctx.state, who, bldg)
 }
 
 export function officeHas(ctx: Ctx, office: string | null | undefined, power: string, subject: string | null = null): string {

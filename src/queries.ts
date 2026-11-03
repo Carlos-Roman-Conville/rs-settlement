@@ -12,6 +12,14 @@ export function titleOver(state: SettlementState, subject: string): Title | null
 
 export const holderOf = (state: SettlementState, subject: string): string => titleOver(state, subject)?.holder ?? 'none'
 
+/** Recorded right of use: the title holder, or an active tenant on that title. */
+export function hasRightOfUse(state: SettlementState, who: string, bldg: string): boolean {
+  const owner = titleOver(state, bldg)
+  if (!owner) return false
+  if (owner.holder === who) return true
+  return Object.values(state.leases).some((entry) => entry.title === owner.id && entry.tenant === who && entry.status === 'active')
+}
+
 export const titlesOf = (state: SettlementState, holder: string): Title[] =>
   Object.values(state.titles).filter((entry) => entry.holder === holder)
 

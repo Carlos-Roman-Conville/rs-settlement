@@ -21,6 +21,7 @@ alignment command the `AlignmentState` JSON is byte-identical to a run without t
 
 | Id | Rule under test | Must hold |
 |---|---|---|
+| U28 | right of use query (`test/engine.test.ts`) | opaque title holder and active tenant allowed; ended tenant, stranger and untitled building refused; canonical state JSON unchanged; query agrees with the command check; parcel-title fallback and lease title matching preserved |
 | U27 | currencies and N-leg payments (`test/multi-currency.test.ts`, §22 T1–T6) | per-currency conservation through 30 wage/rent days and logged issue/retire; exact exchange and barter deltas in one transfer; settlement-only replay; atomic rollback; debt allowed; one-currency fields unchanged; unknown currencies refused; process required for non-money issue/retire |
 | U26 | atomic money and goods (`test/transfer-batch.test.ts`) | one transfer conserves both legs; goods refusal rolls back without logging; zero and fractional units work; opts stay outside the JSON log; settlement-only replay is exact; debt remains allowed (Q19 open) |
 | U25 | kernel money transfers (`test/money-ledger.test.ts`) | wages and pay conserve money; rows, events and replay stay byte-identical; zero/self payments do not move balances; holders and money units are validated; debt remains allowed (Q19 open); failed batches restore accounts atomically |
