@@ -48,6 +48,45 @@ function openShop(ctx: ReturnType<typeof fresh>, operator = 'butcher') {
   return { biz, p1, p2 }
 }
 
+describe('U31 no permit, no draw', () => {
+  function project(permitRequired: boolean) {
+    const ctx = fresh()
+    ctx.providers.materials.set('inv.project', 'timber', 20)
+    const proj = ctx.r.run<string>({ type: 'startProject', kind: 'repair', target: ctx.bldg,
+      account: 'butcher', inventory: 'inv.project', pool: 'pool.housing', labourHours: 10,
+      materials: [{ material: 'timber', units: 10 }], permitRequired })
+    return { ...ctx, proj }
+  }
+
+  it('(a) without a required permit, stock is unchanged and materials are not drawn', () => {
+    const { r, providers, proj } = project(true)
+    const stock = structuredClone(providers.materials.stock)
+    r.tick()
+    expect(providers.materials.stock).toEqual(stock)
+    expect(r.state.projects[proj].materialsDrawn).toBe(false)
+  })
+
+  it('(b) granting the permit lets the next tick draw materials', () => {
+    const { r, providers, proj, bldg } = project(true)
+    r.tick()
+    expect(providers.materials.have('inv.project', 'timber')).toBe(20)
+    expect(r.state.projects[proj].materialsDrawn).toBe(false)
+    const office = r.run<string>({ type: 'createOffice', name: 'permit office', powers: ['permit'] })
+    r.run({ type: 'appoint', office, holder: 'clerk' })
+    r.run({ type: 'grantPermission', office, kind: 'repair', subject: bldg })
+    r.tick()
+    expect(providers.materials.have('inv.project', 'timber')).toBe(10)
+    expect(r.state.projects[proj].materialsDrawn).toBe(true)
+  })
+
+  it('(c) a project that requires no permit draws materials as before', () => {
+    const { r, providers, proj } = project(false)
+    r.tick()
+    expect(providers.materials.have('inv.project', 'timber')).toBe(10)
+    expect(r.state.projects[proj].materialsDrawn).toBe(true)
+  })
+})
+
 describe('U30 funding holds', () => {
   function funded() {
     const r = new Runner(initialState('stl.holds', 'holds'))

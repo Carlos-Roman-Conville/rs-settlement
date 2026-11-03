@@ -21,6 +21,7 @@ alignment command the `AlignmentState` JSON is byte-identical to a run without t
 
 | Id | Rule under test | Must hold |
 |---|---|---|
+| U31 | no permit, no draw (`test/engine.test.ts`) | without a required permit, provider stock is unchanged and `materialsDrawn` stays false; granting a permit lets the next tick draw; `permitRequired: false` draws as before |
 | U30 | funding holds (`test/engine.test.ts`) | per-currency available subtracts active remainders; over-holds and duplicate refs are refused; release moves no money; each settle writes one payment carrying its ref and conserves currency; partial settlement, closed holds, rollback and replay work; unheld pay may drive available negative (Q19 open); no holds key in runs without holds |
 | U29 | tagged may (`test/engine.test.ts`) | pure default yes/no preserves permission grants and denial text; unknown authority leaves canonical state, events and command log unchanged across authority commands; untagged answers are refused; thirty-day replay is exact and the Gate checks unchanged kernel and pirate goldens without Government |
 | U28 | right of use query (`test/engine.test.ts`) | opaque title holder and active tenant allowed; ended tenant, stranger and untitled building refused; canonical state JSON unchanged; query agrees with the command check; parcel-title fallback and lease title matching preserved |
@@ -44,6 +45,18 @@ alignment command the `AlignmentState` JSON is byte-identical to a run without t
 | U20 | inventory rebinding | setInventory validates the business and ref; the next tick consumes the new inventory |
 | U17 | setWage is the only wage channel | over ten ticks `Post.wage` never changes and each day's `wage` row equals it; `setWage` changes it and the next row follows; `.wage =` is written only by `addPost` and `setWage` (Q19 open: may a payer go into debt) |
 | U12 | the engine names nobody | every person id in a state came from a command; `LabourProvider.draw` returns pool ids, never a person the host did not register |
+
+### U31 mechanism record (PRODUCTION)
+
+1. Rule: a permit-required project draws nothing until permitted (PLAN 3.8; SET-48; review adopted by Rex via paste
+   2026-11-02). Valid for every project kind.
+2. Inputs: project `permitRequired`, `permit`, `materials`; Economy stock via `MaterialProvider`. Output: draw or none.
+   Units: material units. Owner: Settlement (order), Economy (stock).
+3. Parameters: none.
+4. Daily, step 2 of the tick.
+5. Tests U31: functional (b), (c); boundary (a); conservation: stock unchanged in (a).
+6. Validation evidence: none yet.
+7. Status: implemented by this unit; holds and destinations (SET-44) wait on Economy.
 
 ### U30 mechanism record (PRODUCTION)
 
