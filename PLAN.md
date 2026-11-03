@@ -116,10 +116,15 @@ someone in charge, every required post filled). Stops applying when a holder is 
 
 **3.2 Labour cap** (`settlement.production.labour_cap`, production.ts:24-27, 45). `labourHours = Σ granted hours ×
 productivity(holder, role)`. Granted hours come from 3.1. `productivity` is [H] (a skill-band table), a labelled stand-in.
-**DC-14 (controller 2026-11-02; Rex may override):** productivity is derived, not stored. Settlement owns the
-composition here, reading Life capacity and effort, Reality task demand, the method Knowledge gates, and Cognition
-skill (KNT-7); the formula is pass-2 work once those ports exist, and no number is invented for it. Each input enters
-once: fatigue arrives only through Life's capacity and effort, never as an extra multiplier. **Risk** of a triple penalty: `realism.population.labour`
+**Simplified (Rex via paste, 2026-11-03): no universal productivity formula.** At aggregate resolution `Q_labour = H_eff / h_per_unit`,
+`H_eff = Σ_i h_i · φ_i,task`: `h_i` actual allocated hours (3.1, later Kernel reservations), `φ_i,task` a declared
+task-specific factor (today `labour.productivity(holder, role)` [H]), `h_per_unit` the recipe's reference requirement.
+No further health, fatigue or skill multiplier is added when the supplied rate already includes that effect. For an
+individually resolved physical task, progress comes from the Reality–Life task model (3.7) and the aggregate formula
+is never run over it again: two declared resolutions of the same work. DC-14's inputs (Life capacity and effort,
+Reality demand, Knowledge method, Cognition skill) enter φ or the task model, each once; they are not composed into
+one multiplier here. Life receives actual elapsed activity, never `H_eff`. Test: better skill may raise output, never
+elapsed time, and never multiplies bodily expenditure by the same factor. Today's code already has this form. **Risk** of a triple penalty: `realism.population.labour`
 already applies health, Life will apply fatigue, and a host could also lower productivity. `Q_labour =
 labourHours / rates.labourHoursPerUnit`. The rate is [H] Economy recipe data (ECON-5) → **Economy** recipe (technique),
 with the physical work per unit from **Reality** mechanics at body resolution. Effective hours are an aggregate approximation (level 4): `labourHours` is never sent to Life as elapsed time, since a productive worker
@@ -141,7 +146,13 @@ Fixture counts are [M] (Settlement records, changed by projects). `unitsPerFixtu
 materials and mechanics (DUP-9). **Confirmed defect (SET-46):** the equipment allowance is recomputed for each line from the
 same fixtures and never reduced (production.ts:34-43), so two lines, or two businesses whose premises share a
 building, each get a machine's full daily capacity. The rule needed is `Σ_ℓ u_ℓr ≤ C_r` for every shared resource r,
-with use and capacity in one declared unit and interval (ST-5).
+with use and capacity in one declared unit and interval (ST-5). Allocate machine time (fixture-days, the declared
+operating interval, until a recipe gives hourly rates), then convert each allocation by its recipe's rate:
+`Q_equipment = r_equipment,task · T_allocated`, so two products may need different machine time (5556).
+**Building condition is not a universal machine penalty (Rex via paste, 2026-11-03):** a worn roof need not slow every machine. The band
+`outputFactor` stays only as an explicitly selected coarse approximation (config `equipmentCondition: 'band-factor'`;
+default `'none'`, SET-54). Building damage reaches operation through a named consequence (lost shelter, unusable
+workspace, power cut, damaged machinery) once that consequence is modelled; no smooth multiplier replaces the table.
 
 **3.5 Materials cap and utility cap.** `materials.available(inventory, recipe)` [M, Economy stock: the floor of inputs ÷
 recipe units]. `utilities.capacity(building, recipe)` [H; stub Infinity, providers.ts:145] → **Reality** (water,
@@ -155,8 +166,11 @@ hoursPerUnit`, and the day's record and status are written. Stops applying when 
 its premises are demolished. Every cap must be in the same output unit and interval. Allocation order is a
 declared rule: today, in order of `biz.lines` for labour only (Q15). It must be stable, recorded in the day's record and
 applied the same way to every shared resource; then the same inputs give the same outputs. "Prior commitment first" is a
-policy for Rex under Q15, not a correction. **Risk (SET-49):** `floor` is right for indivisible units or declared
-batches; for divisible goods it discards fractional output with no work-in-progress record. That rule is open.
+policy for Rex under Q15, not a correction. **Divisibility (SET-49, decided (Rex via paste, 2026-11-03)):** no unconditional floor. Divisible output keeps
+fractional quantities; discrete products complete whole units and keep the unfinished remainder as a work-in-progress
+record (no finished goods early); batch processes follow the recipe's batch rule. Each recipe declares which
+(Economy recipe field, in the CONTRACTS section with Economy, 5557). Test: an interrupted task keeps its recorded
+progress without creating finished goods.
 
 **3.7 The M2 link that does not exist yet: work done → body (ST-3, ST-4).** Today the chain ends at Q. The plan:
 
@@ -212,16 +226,30 @@ and **Knowledge** (technique); VAL-C1.
 - **Confirmed** (SET-45): the project wage goes to the pool's account (`pay(entry.account, entry.pool, wage × hours /
   hoursPerDay)`, :24), not to the persons who worked. It is priced per worker-day through `hoursPerDay`, while post
   wages are a flat amount per day (wages.ts:11).
+- **Staged work (Rex via paste, 2026-11-03):** a project is stages (for example foundation, framing, roofing), each with its
+  requirements and dependencies. Per step `ΔP = min(P_required − P, Σ_i h_i · φ_i,stage)` in reference labour-hours,
+  applied only while the stage's materials, equipment and participation are available. An aggregate approximation, not
+  a claim that any number of workers can work together: each stage declares its crew or workspace limit. Material path:
+  inventory → project stock → installed material, remainder or waste; reservations reduce availability and move no
+  mass. Tests: interruption keeps completed work and delivered material; cancellation accounts for the remaining
+  material; two projects cannot reserve the same stock.
 
-**3.9 Decay** (`settlement.building.condition_decay`, decay.ts:10-19). `dailyLoss = (upper − band.min) / (share ×
-yearsToRuin × 365 × exposure)`. Shares 400:300:150 of 850 (config.ts:37) [H, level 5]. `yearsToRuin` per class [H,
-secondary and modern sources, VALIDATION §4b]. `exposure`: sheltered 1, salt-wind null [H]. A building with no class
-or a null value does not decay and is listed by `unvalidatedDecay()`. **Confirmed defect (SET-47):** any active repair project suspends all decay (decay.ts:6-9), even with no materials
+**3.9 Decay** (`settlement.building.condition_decay`, decay.ts:10-19). **Simplified (Rex via paste, 2026-11-03), SET-55:**
+one declared rate per represented component, `c(t+Δt) = max(0, c(t) − d·Δt)`, `c ∈ [0, 1]` a defined service-condition
+index, `d ≥ 0` per unit time, matching units. Today's classes are roof service lives (config.ts:27), so the one
+component is the roof: `c ← max(c_end, c − d_roof)`, `d_roof = (1 − c_end) / (yearsToRuin × 365 × exposure)` per day,
+`c_end` the bound where `ruined` begins (0.2 today), so the endpoint "end of roof service life" is entering `ruined`
+(5617). A labelled approximation that never predicts structural collapse. Bands stay as display labels; the band shares
+400:300:150 of 850 (config.ts:37) [H, level 5] are retired. `yearsToRuin` per class [H, secondary and modern sources,
+VALIDATION §4b]; `exposure` sheltered 1, salt-wind null [H]. Missing data is reported as unsupported
+(`unvalidatedDecay()` and the run record), never read as immortality. Further components only when a modelled
+consequence needs them (roof → shelter). Tests: one step and subdivided steps agree; a stalled repair gives no
+protection; missing data is reported. **Confirmed defect (SET-47):** any active repair project suspends all decay (decay.ts:6-9), even with no materials
 or labour, so a stalled repair makes a building immune. Fix: decay runs whatever projects are open. Only modelled
 repair work, or a modelled protective action, changes condition. No proportional reduction and no decay floor: neither
 has a source. Completed repair restores condition per the material model.
 → **Reality** materials and weather (DUP-9); then these numbers become validation data. SET-20, Q1b. The output feeds
-3.4 through the band factor.
+3.4 only where a host selects the band factor (SET-54).
 
 **3.10 Wages and rents** (`settlement.wage.pay`, `settlement.property.lease`, wages.ts:5-18). Each filled post with a
 wage above 0 pays `post.wage` [H, `setWage` → **Economy** `economy.labour.wage_quote`, CONTRACTS §16, §19]. The
@@ -229,7 +257,8 @@ business pays, or the treasury holder for public works. Each active lease pays `
 to the title holder. Every payment is one kernel transfer (context.ts:66-94). Balances may go negative (Q19). **Contract forms (ST-8):** a fixed daily wage, `W = r_h · h_payable`, and `W = r_q ·
 Q_accepted` are all valid. Economy supplies the rates; Settlement applies the agreement a post or project declares.
 Payable hours need not equal active hours. Today posts pay a flat daily wage, and projects prorate through
-`hoursPerDay` and pay the pool (SET-45). That difference is accidental until a declared contract form names it.
+`hoursPerDay` and pay the pool (SET-45). That difference is accidental until a declared contract form names it. Posts (fixed per period) and projects (hours)
+stay distinct, each declared, not forced into one formula; paid time may include waiting or attendance (Rex via paste, 2026-11-03).
 
 **3.11 Treasury** (state.ts:12, 230-233). The treasury is account `acct.0001`, holder `town`: its own account (Q7
 default; `port.cash` stays a story key). Outflows: public-works wages. Inflows: only explicit `credit` commands. No tax:
@@ -363,9 +392,9 @@ checkpoint's acceptance.
 | ST-2 Money and payments | Who pays whom, in which currency, exactly once? | prices and wages (Economy), credit policy (Q19; Government later) | double entry per currency; boundary rows | accounting identity | U25-U27; a multi-party payment commits once or rolls back; no cross-currency sum | n/a; credit is a separate assumption | Economy `LedgerProvider`, kernel transfer records |
 | ST-3 Staffing and time | Which person-hours go to which post or project? | bodily bound (Life), intention (Cognition), the reservation ledger (Kernel, NP-17) | one budget per person or cohort in the shared reservation system (NP-17), reserve and release (3.7.1) | constraint, level 1; `hoursPerDay` SET-12 | the same hour is never supplied twice across posts and projects; concurrent shares never exceed the bound; elapsed time never restored; a rolled-back tick leaves no reservation | hours per day against Voth (SET-12) | Kernel's reservation ledger (NP-17) bounded by Life's `LabourSupply`; new contract section replacing §21 netting |
 | ST-4 Task execution and bodily feedback | What work happened, for how long, with what progress? | demand (Reality), response (Life), skill and participation (Cognition) | bounded intervals; activity record (3.7.2-3) | Reality and Life models; daily step labelled level 4 | one activity record ↔ one Life row; interruption keeps progress; replay | M2-P paired run | IT-M2-1, IT-M2-2 |
-| ST-5 Production and shared resources | How many units each line makes within shared capacities? | recipes and stock (Economy), utilities (Reality) | Leontief per line (level 4) with `Σ_ℓ u_ℓr ≤ C_r`; declared stable order (Q15); divisibility rule (SET-49) | no shop-output series (gap) | shared machine, shared utility, partial batch, mid-step failure | VAL-S1; competing CES model | Economy I1, I2 |
+| ST-5 Production and shared resources | How many units each line makes within shared capacities? | recipes and stock (Economy), utilities (Reality) | Leontief per line (level 4) with `Σ_ℓ u_ℓr ≤ C_r`; declared stable order (Q15); machine time allocated, converted per recipe; divisibility per recipe (SET-49) | no shop-output series (gap) | shared machine, shared utility, partial batch, mid-step failure | VAL-S1; competing CES model | Economy I1, I2 |
 | ST-6 Construction and repair | How materials, labour and permits become fabric? | holds and stock (Economy), mechanics (Reality) | material states with holds (3.8); permit before draw; roles from the project | VAL-C1 sources | holds exclusive; no permit, no draw; cancellation destinations; mass balance | VAL-C1 | Economy holds (reserve, release, fulfil) |
-| ST-7 Condition, deterioration, demolition | How condition changes; where demolished material goes? | material physics and weather (Reality, DUP-9) | interim class decay; repair only by modelled work (3.9) | VALIDATION §4b, level 5 | a stalled repair does not stop decay; demolition balance | VAL-D1 is verification; period interval needed (SET-20) | Reality materials |
+| ST-7 Condition, deterioration, demolition | How condition changes; where demolished material goes? | material physics and weather (Reality, DUP-9) | one constant rate per component, roof first (3.9, SET-55); repair only by modelled work | VALIDATION §4b, level 5 | a stalled repair does not stop decay; demolition balance | VAL-D1 is verification; period interval needed (SET-20) | Reality materials |
 | ST-8 Wages, rent, obligations | What is due under which declared contract? | rates (Economy) | contract forms (3.10) | VAL-W1, VAL-R1 bands | partial attendance per contract; post and project forms declared | VAL-W1, VAL-R1 | Economy wage quote (§19) |
 | ST-9 Infrastructure and land use | What area, use and services each parcel gets? | water, power, light, soil (Reality); plants (Life) | `use` per parcel (Q18); service allocation within supplied capacity | PACKAGES §8; Q16-Q18, historical first | a field or workshop gets the correct area and service share | period sanitation (Q17) | Life plants, Reality soil and utilities |
 | ST-10 Public accounts and institutional commands | Execute authorised appointments, treasury payments and other changes | decisions, tax, succession (Government); organisations (Society) | rules of record under `AuthorityProvider` | government DESIGN §2.3 | an unauthorised command is refused; a treasury payment moves once | n/a | Government (SET-33), Society (SET-34) |
@@ -385,6 +414,11 @@ defects block correctness claims for production and construction only, not the M
 meaningful demonstration (CP-2) is one worker completing or interrupting a task, with time, progress and bodily cost
 each recorded by its owner. Materials, output and payment are added at CP-3.
 
+Simplification adopted (Rex via paste, 2026-11-03): keep the minimum-capacity production model and simple contract arithmetic;
+task-specific progress at its own resolution (3.2); a labelled constant-rate component model for decay (3.9); no
+universal building-condition machine penalty (3.4); staged construction (3.8). Deferred: detailed structural ageing and
+a general productivity formula. The time, material and shared-equipment fixes stay required.
+
 Not adopted from the review discussion, as its own verdict says: "prior commitment first" as the allocation priority
 (a policy for Rex under Q15); a proportional repair reduction with a decay floor (no source).
 
@@ -403,7 +437,7 @@ Not adopted from the review discussion, as its own verdict says: "prior commitme
 | Q20 | a line with every cap Infinity | throws before any produce |
 | SET-20 | decay is a candidate model, not validated | interim class model; unclassified buildings do not decay |
 | SET-42 | whether idle committed time costs the body anything | for Life to state |
-| SET-49 | divisible output and work in progress under `floor` | floor everywhere today |
+| SET-49 | divisible output and work in progress under `floor` | rule decided 2026-11-03 (3.6); floor stays until Economy's recipes declare divisibility (5557) |
 | SET-50 | one time-reservation system for every activity, held by Kernel (NP-17 ruled 2026-11-02; Life bounds, Cognition intends; a contract change from §21) | client netting inside staffing; pools netted by the provider |
 | SET-51 | monetary precision and rounding | plain numbers, no rounding rule |
 | SET-43 | owner of a task's physical demand | closed by M2-04b: Reality demand, Life effort |
